@@ -797,8 +797,195 @@ Reply ONLY with valid JSON, no markdown fences:
   );
 }
 
+// ── Reports View ──────────────────────────────────────────────────────
+function ReportsView({fields,activities,onBack}){
+  const[type,setType]=useState("spraying");
+  const[sortBy,setSortBy]=useState("date");   // "date" | "field"
+  const[dateFrom,setDateFrom]=useState("");
+  const[dateTo,setDateTo]=useState("");
+
+  const fieldName=(id)=>fields.find(f=>f.id===id)?.name||"Unknown Field";
+
+  // Filter and sort
+  const results=activities
+    .filter(a=>a.type===type)
+    .filter(a=>!dateFrom||a.date>=dateFrom)
+    .filter(a=>!dateTo  ||a.date<=dateTo+"T23:59")
+    .sort((a,b)=>sortBy==="field"
+      ? fieldName(a.fieldId).localeCompare(fieldName(b.fieldId)) || new Date(b.date)-new Date(a.date)
+      : new Date(b.date)-new Date(a.date));
+
+  const meta=ACTIVITY_META[type]||ACTIVITY_META.other;
+
+  const print=()=>{
+    const style=document.createElement("style");
+    style.id="print-style";
+    style.textContent=`@media print{body{background:#fff!important;color:#000!important;font-family:Arial,sans-serif;} .no-print{display:none!important;} .print-card{border:1px solid #ccc!important;background:#fff!important;break-inside:avoid;margin-bottom:8px;padding:10px;} h1,h2,h3{color:#000!important;}}`;
+    document.head.appendChild(style);
+    window.print();
+    setTimeout(()=>document.getElementById("print-style")?.remove(),1000);
+  };
+
+  const renderDetail=(a)=>{
+    const d=a.data||{};
+    if(a.type==="spraying") return(
+      <div>
+        <div style={{display:"flex",gap:"20px",flexWrap:"wrap",marginBottom:"8px",fontSize:"13px"}}>
+          {d.waterVol&&<span><span style={{color:T.muted}}>Water:</span> {d.waterVol} gal/ac</span>}
+          {d.equipment&&<span><span style={{color:T.muted}}>Equipment:</span> {d.equipment}</span>}
+          {d.purpose&&<span><span style={{color:T.muted}}>Purpose:</span> {d.purpose}</span>}
+        </div>
+        {(d.tankMix||[]).length>0&&(
+          <table style={{width:"100%",borderCollapse:"collapse",fontSize:"13px"}}>
+            <thead>
+              <tr style={{background:T.panel}}>
+                <th style={{textAlign:"left",padding:"5px 8px",color:T.muted,fontWeight:600,fontSize:"11px",textTransform:"uppercase",letterSpacing:"0.7px"}}>Chemical</th>
+                <th style={{textAlign:"right",padding:"5px 8px",color:T.muted,fontWeight:600,fontSize:"11px",textTransform:"uppercase",letterSpacing:"0.7px"}}>Rate</th>
+              </tr>
+            </thead>
+            <tbody>
+              {d.tankMix.map((c,i)=>(
+                <tr key={i} style={{borderBottom:`1px solid ${T.border}`}}>
+                  <td style={{padding:"5px 8px"}}>{c.chemical==="Other"?(c.chemicalName||"—"):c.chemical}</td>
+                  <td style={{padding:"5px 8px",textAlign:"right",fontWeight:600,color:T.gold}}>{c.oz} {c.unit}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+    );
+    if(a.type==="seeding") return(
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))",gap:"6px 16px",fontSize:"13px"}}>
+        {d.crop&&<span><span style={{color:T.muted}}>Crop:</span> {d.crop}</span>}
+        {d.seedRate&&<span><span style={{color:T.muted}}>Seed rate:</span> {d.seedRate} lbs/ac</span>}
+        {d.totalSeed&&<span><span style={{color:T.muted}}>Total seed:</span> {Number(d.totalSeed).toLocaleString()} lbs</span>}
+        {d.fertBlend&&<span><span style={{color:T.muted}}>Fert blend:</span> {d.fertBlend==="Custom Blend"?d.fertCustom:d.fertBlend}</span>}
+        {d.fertRate&&<span><span style={{color:T.muted}}>Fert rate:</span> {d.fertRate} lbs/ac</span>}
+        {d.totalFert&&<span><span style={{color:T.muted}}>Total fert:</span> {Number(d.totalFert).toLocaleString()} lbs</span>}
+        {d.inoculantProduct&&<span><span style={{color:T.muted}}>Inoculant:</span> {d.inoculantProduct} @ {d.inoculantRate}</span>}
+        {d.equipment&&<span><span style={{color:T.muted}}>Equipment:</span> {d.equipment}</span>}
+        {d.depth&&<span><span style={{color:T.muted}}>Depth:</span> {d.depth}"</span>}
+      </div>
+    );
+    return d.details?<p style={{margin:0,fontSize:"13px"}}>{d.details}</p>:null;
+  };
+
+  return(
+    <div>
+      {/* Header */}
+      <div style={{display:"flex",alignItems:"center",gap:"10px",marginBottom:"20px",flexWrap:"wrap"}} className="no-print">
+        <button style={{...mkBtn("ghost"),padding:"6px 12px"}} onClick={onBack}>← Home</button>
+        <h2 style={{fontFamily:"'Playfair Display',serif",fontSize:"22px",margin:0,flex:1}}>Reports</h2>
+        <button style={{...mkBtn("ghost"),padding:"7px 14px",fontSize:"13px"}} onClick={print}>🖨 Print</button>
+      </div>
+
+      {/* Filters */}
+      <div style={{...S.card,marginBottom:"16px"}} className="no-print">
+        <div style={{display:"flex",gap:"10px",flexWrap:"wrap",alignItems:"flex-end"}}>
+          {/* Activity type */}
+          <div style={{flex:"1 1 300px"}}>
+            <label style={S.label}>Activity Type</label>
+            <div style={{display:"flex",gap:"6px",flexWrap:"wrap"}}>
+              {Object.entries(ACTIVITY_META).map(([k,m])=>(
+                <button key={k} style={{
+                  ...mkBtn("ghost"),padding:"6px 12px",fontSize:"12px",
+                  background:type===k?m.color:"transparent",
+                  color:type===k?"#FFFFFF":T.muted,
+                  border:`1px solid ${type===k?m.color:T.border}`,
+                  borderRadius:"6px",
+                }} onClick={()=>setType(k)}>
+                  {m.icon} {m.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          {/* Date range */}
+          <div style={{display:"flex",gap:"8px",alignItems:"flex-end",flexWrap:"wrap"}}>
+            <div>
+              <label style={S.label}>From</label>
+              <input style={{...S.input,width:"140px"}} type="date" value={dateFrom} onChange={e=>setDateFrom(e.target.value)}/>
+            </div>
+            <div>
+              <label style={S.label}>To</label>
+              <input style={{...S.input,width:"140px"}} type="date" value={dateTo} onChange={e=>setDateTo(e.target.value)}/>
+            </div>
+            {(dateFrom||dateTo)&&<button style={{...mkBtn("ghost"),padding:"6px 10px",fontSize:"12px"}} onClick={()=>{setDateFrom("");setDateTo("");}}>Clear</button>}
+          </div>
+          {/* Sort */}
+          <div>
+            <label style={S.label}>Sort By</label>
+            <div style={{display:"flex",gap:"4px"}}>
+              <button style={{...mkBtn("ghost"),padding:"5px 12px",fontSize:"12px",background:sortBy==="date"?T.gold:"transparent",color:sortBy==="date"?"#FFFFFF":T.muted,border:`1px solid ${sortBy==="date"?T.gold:T.border}`}} onClick={()=>setSortBy("date")}>Date</button>
+              <button style={{...mkBtn("ghost"),padding:"5px 12px",fontSize:"12px",background:sortBy==="field"?T.gold:"transparent",color:sortBy==="field"?"#FFFFFF":T.muted,border:`1px solid ${sortBy==="field"?T.gold:T.border}`}} onClick={()=>setSortBy("field")}>Field</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Print header (only shows when printing) */}
+      <div style={{display:"none"}} className="print-header">
+        <h1 style={{fontFamily:"'Playfair Display',serif",marginBottom:"4px"}}>{meta.icon} {meta.label} Report</h1>
+        <p style={{color:T.muted,fontSize:"13px",marginBottom:"16px"}}>Generated {new Date().toLocaleDateString("en-US",{year:"numeric",month:"long",day:"numeric"})} · {results.length} record{results.length!==1?"s":""}</p>
+      </div>
+
+      {/* Summary bar */}
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"12px"}}>
+        <div style={{display:"flex",alignItems:"center",gap:"10px"}}>
+          <span style={{fontFamily:"'Playfair Display',serif",fontSize:"18px",color:meta.color}}>{meta.icon} {meta.label}</span>
+          <span style={{background:meta.color,color:"#fff",borderRadius:"12px",padding:"2px 10px",fontSize:"12px",fontWeight:700}}>{results.length} record{results.length!==1?"s":""}</span>
+        </div>
+        {results.length>0&&sortBy==="field"&&<span style={{fontSize:"12px",color:T.muted}}>{[...new Set(results.map(a=>a.fieldId))].length} field{[...new Set(results.map(a=>a.fieldId))].length!==1?"s":""}</span>}
+      </div>
+
+      {/* Results */}
+      {results.length===0&&(
+        <div style={{...S.card,textAlign:"center",padding:"40px",color:T.faint}}>
+          No {meta.label.toLowerCase()} records found{(dateFrom||dateTo)?" in this date range":""}.
+        </div>
+      )}
+
+      {sortBy==="field"
+        ? // Grouped by field
+          [...new Set(results.map(a=>a.fieldId))].map(fid=>{
+            const fName=fieldName(fid);
+            const fResults=results.filter(a=>a.fieldId===fid);
+            return(
+              <div key={fid} style={{marginBottom:"20px"}}>
+                <h3 style={{fontFamily:"'Playfair Display',serif",fontSize:"15px",color:T.text,margin:"0 0 8px",paddingBottom:"6px",borderBottom:`2px solid ${meta.color}`}}>
+                  🌾 {fName} <span style={{color:T.muted,fontSize:"12px",fontWeight:400}}>— {fResults.length} application{fResults.length!==1?"s":""}</span>
+                </h3>
+                {fResults.map(a=>(
+                  <div key={a.id} style={{...S.card,borderLeft:`3px solid ${meta.color}`,padding:"12px 14px",marginBottom:"8px"}} className="print-card">
+                    <div style={{display:"flex",alignItems:"center",gap:"8px",marginBottom:"8px"}}>
+                      <span style={{fontWeight:700,fontSize:"13px",color:meta.color}}>{fmtDate(a.date)}</span>
+                    </div>
+                    {renderDetail(a)}
+                    {a.notes&&<p style={{margin:"8px 0 0",fontSize:"12px",color:T.muted,fontStyle:"italic"}}>📝 {a.notes}</p>}
+                  </div>
+                ))}
+              </div>
+            );
+          })
+        : // Sorted by date
+          results.map(a=>(
+            <div key={a.id} style={{...S.card,borderLeft:`3px solid ${meta.color}`,padding:"12px 14px",marginBottom:"8px"}} className="print-card">
+              <div style={{display:"flex",alignItems:"center",gap:"10px",marginBottom:"8px",flexWrap:"wrap"}}>
+                <span style={{fontWeight:700,fontSize:"14px",color:T.text}}>🌾 {fieldName(a.fieldId)}</span>
+                <span style={{color:T.faint}}>·</span>
+                <span style={{fontSize:"13px",color:meta.color,fontWeight:600}}>{fmtDate(a.date)}</span>
+              </div>
+              {renderDetail(a)}
+              {a.notes&&<p style={{margin:"8px 0 0",fontSize:"12px",color:T.muted,fontStyle:"italic"}}>📝 {a.notes}</p>}
+            </div>
+          ))
+      }
+    </div>
+  );
+}
+
 // ── Home View ─────────────────────────────────────────────────────────
-function HomeView({fields,activities,onSelect,onAdd,onImport}){
+function HomeView({fields,activities,onSelect,onAdd,onImport,onReport}){
   const[q,setQ]=useState("");
   const filtered=fields.filter(f=>f.name.toLowerCase().includes(q.toLowerCase())||(f.legalDesc||"").toLowerCase().includes(q.toLowerCase()));
   return(
@@ -809,6 +996,7 @@ function HomeView({fields,activities,onSelect,onAdd,onImport}){
           <h2 style={{fontFamily:"'Playfair Display',serif",fontSize:"24px",margin:"0 0 4px",color:T.gold}}>FieldLog</h2>
           <p style={{margin:0,fontSize:"13px",color:T.muted}}>{fields.length} field{fields.length!==1?"s":""} · {activities.length} activit{activities.length!==1?"ies":"y"} logged</p>
         </div>
+        <button style={{...mkBtn("ghost"),padding:"10px 16px",fontSize:"14px"}} onClick={onReport}>📊 Reports</button>
         <button style={{...mkBtn("ghost"),padding:"10px 16px",fontSize:"14px"}} onClick={onImport}>⬆ Import</button>
         <button style={{...mkBtn("primary"),padding:"10px 20px",fontSize:"14px"}} onClick={onAdd}>+ Add Field</button>
       </div>
@@ -974,7 +1162,8 @@ export default function App(){
       )}
 
       <div style={S.content}>
-        {view==="home"        &&<HomeView fields={fields} activities={activities} onSelect={f=>{setAF(f);setView("fieldDetail");}} onAdd={()=>setView("addField")} onImport={()=>setShowImport(true)}/>}
+        {view==="home"        &&<HomeView fields={fields} activities={activities} onSelect={f=>{setAF(f);setView("fieldDetail");}} onAdd={()=>setView("addField")} onImport={()=>setShowImport(true)} onReport={()=>setView("reports")}/>}
+        {view==="reports"     &&<ReportsView fields={fields} activities={activities} onBack={()=>setView("home")}/>}
         {view==="addField"    &&<AddFieldView onBack={()=>setView("home")} onSave={addField}/>}
         {view==="fieldDetail" &&curField&&<FieldDetailView field={curField} activities={activities} onBack={()=>setView("home")} onAddActivity={()=>setShowAdd(true)} onDeleteActivity={delActivity} onUpdateField={updateField} onDeleteField={deleteField}/>}
       </div>
