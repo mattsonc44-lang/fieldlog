@@ -557,6 +557,10 @@ function ImportFieldsModal({onClose,onImport}){
     const file=e.target.files[0]; if(!file) return;
     setBusy(true); setErr(""); setScanNote("");
     try{
+      // Check key is present
+      if(!ANTHROPIC_KEY){
+        throw new Error("API key not configured — check your ANTHROPIC_KEY environment variable in Netlify.");
+      }
       const base64=await new Promise((res,rej)=>{
         const r=new FileReader();
         r.onload=()=>res(r.result.split(",")[1]);
@@ -586,10 +590,19 @@ Reply ONLY with valid JSON, no markdown, no explanation:
           ]}]
         })
       });
+      // Check HTTP status first
+      if(!resp.ok){
+        const errBody=await resp.text();
+        throw new Error(`API returned ${resp.status}: ${errBody.slice(0,200)}`);
+      }
       const data=await resp.json();
-      const txt=data.content?.filter(b=>b.type==="text").map(b=>b.text).join("")||"";
-      const clean=txt.replace(/```json|```/g,"").trim();
-      const result=JSON.parse(clean);
+      // Extract text content
+      const txt=(data.content||[]).filter(b=>b.type==="text").map(b=>b.text).join("").trim();
+      if(!txt) throw new Error("Empty response from API");
+      // Pull out the JSON object even if surrounded by extra text
+      const match=txt.match(/\{[\s\S]*\}/);
+      if(!match) throw new Error("No JSON found in response. Raw: "+txt.slice(0,120));
+      const result=JSON.parse(match[0]);
       setScanNote(result.notes||"");
       const fields=(result.fields||[]).map(f=>({
         id:genId(), name:f.name||"Scanned Field",
