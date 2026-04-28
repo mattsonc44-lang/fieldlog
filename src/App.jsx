@@ -41,7 +41,7 @@ const CROPS        = ["Wheat","Durum","Barley","Oats","Canola","Flax","Peas","Le
 const FERT_BLENDS  = ["28-0-0 (UAN)","46-0-0 (Urea)","11-52-0 (MAP)","18-46-0 (DAP)","0-0-60 (Potash)","10-26-26","34-0-0 (AN)","12-40-0","Custom Blend"];
 const CHEMICALS    = ["Glyphosate (Roundup)","2,4-D Amine","MCPA Amine","Lontrel 360","Infinity","Odyssey","Axial","Puma Super","Buctril M","Muster 75DF","Centurion","Tundra","Refine M","Bumper 418 EC","Stratego YLD","Headline","Priaxor","Trivapro","Dimethoate","Matador","Other"];
 const ACTIVITY_META = {
-  seeding:     {label:"Seeding",      icon:"🌱",color:"#8C5408"},
+  seeding:     {label:"Seeding",      icon:"🌱",color:"#C07010"},
   spraying:    {label:"Spraying",     icon:"💧",color:"#4A90C8"},
   rockPicking: {label:"Rock Picking", icon:"🪨",color:"#9A7060"},
   tillage:     {label:"Tillage",      icon:"⚙️", color:"#6B8F71"},
@@ -133,7 +133,7 @@ const convexHull = (pts) => {
 const T={
   bg:"#F4EFE6",panel:"#E8DFD0",card:"#FFFFFF",cardHov:"#F0E8D8",
   border:"#D8CEBC",borderHi:"#C4A468",
-  gold:"#8C5408",goldSoft:"#A86810",
+  gold:"#C07010",goldSoft:"#D48820",
   text:"#1E1408",muted:"#7A6645",faint:"#B8A880",
   green:"#2A5E2A",blue:"#1E5078",danger:"#841A18",
 };
@@ -155,7 +155,7 @@ const mkBtn=(v="primary")=>({
   border:v==="ghost"?`1px solid ${T.border}`:v==="outline"?`1px solid ${T.gold}`:"none",
   cursor:"pointer",fontSize:"13px",fontWeight:600,fontFamily:"'Barlow',sans-serif",
   background:v==="primary"?T.gold:v==="danger"?T.danger:"transparent",
-  color:v==="primary"?"#1E0800":v==="danger"?"#FFCCCC":v==="outline"?T.gold:T.muted,
+  color:v==="primary"?"#FFFFFF":v==="danger"?"#FFFFFF":v==="outline"?T.gold:T.muted,
 });
 
 // ╔═══════════════════════════════════════════════════════════╗
@@ -255,8 +255,8 @@ function FieldMap({boundary=[],onBoundaryChange,height=350}){
         onTouchStart={onTS} onTouchMove={onTM} onTouchEnd={onTE}>
         {tiles.map(t=><img key={t.key} src={t.src} alt="" draggable={false} style={{position:"absolute",left:`${t.left}px`,top:`${t.top}px`,width:"256px",height:"256px",display:"block",pointerEvents:"none"}}/>)}
         <svg style={{position:"absolute",inset:0,width:"100%",height:"100%",pointerEvents:"none",overflow:"visible"}}>
-          {nPts>=3&&<polygon points={polyStr} fill="rgba(200,149,42,0.22)" stroke="#8C5408" strokeWidth="2.5" strokeLinejoin="round"/>}
-          {nPts===2&&(()=>{const[ax,ay]=ll2px(pts[0][0],pts[0][1]),[bx,by]=ll2px(pts[1][0],pts[1][1]);return<line x1={ax} y1={ay} x2={bx} y2={by} stroke="#8C5408" strokeWidth="2.5"/>;})()}
+          {nPts>=3&&<polygon points={polyStr} fill="rgba(200,149,42,0.22)" stroke="#C07010" strokeWidth="2.5" strokeLinejoin="round"/>}
+          {nPts===2&&(()=>{const[ax,ay]=ll2px(pts[0][0],pts[0][1]),[bx,by]=ll2px(pts[1][0],pts[1][1]);return<line x1={ax} y1={ay} x2={bx} y2={by} stroke="#C07010" strokeWidth="2.5"/>;})()}
           {pts.map(([la,ln],i)=>{const[px,py]=ll2px(la,ln);return(<g key={i}><circle cx={px} cy={py} r={6} fill="#E8B84B" stroke="#A07020" strokeWidth={2}/><text x={px} y={py} textAnchor="middle" dominantBaseline="middle" fill="#1A0E04" fontSize={9} fontWeight="bold">{i+1}</text></g>);})}
         </svg>
         <div style={{position:"absolute",bottom:0,right:0,background:"rgba(0,0,0,0.55)",color:"#bbb",fontSize:"9px",padding:"2px 6px",pointerEvents:"none"}}>© Esri, DigitalGlobe, GeoEye</div>
@@ -330,7 +330,7 @@ function SprayingForm({v,set}){
       <div style={{background:"#EEF3FA",border:`1px solid #A8C0DC`,borderRadius:"8px",padding:"14px",marginBottom:"14px"}}>
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"12px"}}>
           <p style={{margin:0,fontSize:"11px",color:"#2A5080",textTransform:"uppercase",letterSpacing:"0.9px",fontWeight:700}}>💧 Tank Mix</p>
-          <button style={{...mkBtn("ghost"),padding:"5px 12px",fontSize:"12px",borderColor:"#1E5078",color:"#4A90C8"}} onClick={add}>+ Add Chemical</button>
+          <button style={{...mkBtn("ghost"),padding:"5px 12px",fontSize:"12px",borderColor:"#1E5078",color:"#1E5078"}} onClick={add}>+ Add Chemical</button>
         </div>
         {mix.length===0&&<div style={{textAlign:"center",padding:"18px",color:T.faint,fontSize:"13px",border:`1px dashed ${T.border}`,borderRadius:"6px"}}>Click "+ Add Chemical" to build your tank mix</div>}
         {mix.map((c,i)=>(
@@ -477,7 +477,7 @@ function FieldDetailView({field,activities,onBack,onAddActivity,onDeleteActivity
       {/* Delete confirmation */}
       {confirmDelete&&(
         <div style={{...S.card,background:"#FDF0EE",border:`1px solid #E0A0A0`,marginBottom:"16px",display:"flex",alignItems:"center",gap:"12px",flexWrap:"wrap"}}>
-          <span style={{flex:1,fontSize:"13px",color:"#8A1010"}}>Delete <strong>{field.name}</strong> and all its activity logs? This cannot be undone.</span>
+          <span style={{flex:1,fontSize:"13px",color:"#841A18"}}>Delete <strong>{field.name}</strong> and all its activity logs? This cannot be undone.</span>
           <button style={{...mkBtn("danger"),padding:"6px 14px",fontSize:"12px"}} onClick={()=>onDeleteField(field.id)}>Yes, Delete</button>
           <button style={{...mkBtn("ghost"),padding:"6px 12px",fontSize:"12px"}} onClick={()=>setConfirmDelete(false)}>Cancel</button>
         </div>
@@ -766,7 +766,7 @@ Reply ONLY with valid JSON, no markdown fences:
               <div style={{display:"flex",gap:"8px",alignItems:"center",background:"#EDF2FB",border:`1px solid #A0B8E0`,borderRadius:"8px",padding:"10px 12px",marginBottom:"10px",flexWrap:"wrap"}}>
                 <span style={{fontSize:"12px",color:"#2A4A90",fontWeight:700}}>🔗 Merge {selCount} selected fields</span>
                 <input style={{...S.input,flex:"1 1 160px",padding:"5px 10px",fontSize:"12px"}} placeholder="Name for merged field (optional)" value={mergeName} onChange={e=>setMergeName(e.target.value)}/>
-                <button style={{...mkBtn("primary"),padding:"6px 14px",fontSize:"12px",background:"#3A5AAA",color:"#fff"}} onClick={doMerge}>Merge →</button>
+                <button style={{...mkBtn("primary"),padding:"6px 14px",fontSize:"12px",background:"#2A4A9A",color:"#fff"}} onClick={doMerge}>Merge →</button>
               </div>
             )}
 
