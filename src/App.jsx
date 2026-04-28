@@ -3,7 +3,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 // ╔══════════════════════════════════════════════════════════════════════╗
 // ║  FIREBASE CONFIG — paste your project values here                  ║
 // ╠══════════════════════════════════════════════════════════════════════╣
-const FIREBASE_URL = "https://fieldlog-cd3e6-default-rtdb.firebaseio.com/";
+const FIREBASE_URL = "https://YOUR-PROJECT-default-rtdb.firebaseio.com";
 const DB_PATH      = "fieldlog";   // root key in Realtime DB
 // ╚══════════════════════════════════════════════════════════════════════╝
 
@@ -100,8 +100,21 @@ function FieldMap({boundary=[],onBoundaryChange,height=350}){
   const wrapRef=useRef(null);
   const dragRef=useRef({on:false,sx:0,sy:0,sc:[0,0],moved:false});
   const touchR =useRef({x:0,y:0,sc:[0,0],moved:false});
-  const [ctr,setCtr]=useState([48.513,-110.979]);
-  const [zoom,setZoom]=useState(14);
+  const [ctr,setCtr]=useState(()=>{
+    if(boundary&&boundary.length>0){
+      const lats=boundary.map(p=>p[0]),lngs=boundary.map(p=>p[1]);
+      return[(Math.min(...lats)+Math.max(...lats))/2,(Math.min(...lngs)+Math.max(...lngs))/2];
+    }
+    return[48.513,-110.979];
+  });
+  const [zoom,setZoom]=useState(()=>{
+    if(boundary&&boundary.length>1){
+      const lats=boundary.map(p=>p[0]),lngs=boundary.map(p=>p[1]);
+      const span=Math.max(Math.max(...lats)-Math.min(...lats),Math.max(...lngs)-Math.min(...lngs));
+      return Math.min(17,Math.max(12,Math.round(Math.log2(0.08/span)+14)));
+    }
+    return 14;
+  });
   const [pts,setPts]=useState(boundary.length?[...boundary]:[]);
   const [saved,setSaved]=useState(false);
   const [W,setW]=useState(600);
