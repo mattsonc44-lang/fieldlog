@@ -1,0 +1,16 @@
+{
+  "name": "fieldlog",
+  "version": "1.0.0",
+  "description": "Farm field activity tracker",
+  "scripts": {
+    "build": "esbuild src/index.jsx --bundle --outfile=public/bundle.js --loader:.jsx=jsx --define:process.env.NODE_ENV='\"production\"'",
+    "dev":   "esbuild src/index.jsx --bundle --outfile=public/bundle.js --loader:.jsx=jsx --watch"
+  },
+  "devDependencies": {
+    "esbuild": "^0.21.0"
+  },
+  "dependencies": {
+    "react": "^18.3.0",
+    "react-dom": "^18.3.0"
+  }
+}
