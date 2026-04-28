@@ -3,7 +3,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 // ╔══════════════════════════════════════════════════════════════════════╗
 // ║  FIREBASE CONFIG — paste your project values here                  ║
 // ╠══════════════════════════════════════════════════════════════════════╣
-const FIREBASE_URL = "https://fieldlog-cd3e6-default-rtdb.firebaseio.com";
+const FIREBASE_URL = "https://YOUR-PROJECT-default-rtdb.firebaseio.com";
 const DB_PATH      = "fieldlog";   // root key in Realtime DB
 // ╚══════════════════════════════════════════════════════════════════════╝
 
@@ -391,7 +391,7 @@ function AddActivityModal({field,onClose,onSave}){
 
 // ── Field Detail ──────────────────────────────────────────────────────
 function FieldDetailView({field,activities,onBack,onAddActivity,onDeleteActivity,onUpdateField}){
-  const[mapOpen,setMapOpen]=useState(false);const[editName,setEditName]=useState(false);
+  const[mapOpen,setMapOpen]=useState(field.boundary?.length>=3);const[editName,setEditName]=useState(false);
   const[nameVal,setNameVal]=useState(field.name);const[acresVal,setAcresVal]=useState(field.acres||"");
   const[filter,setFilter]=useState("all");
   const all=activities.filter(a=>a.fieldId===field.id);
@@ -416,7 +416,7 @@ function FieldDetailView({field,activities,onBack,onAddActivity,onDeleteActivity
           </button>
         </div>
         {!mapOpen&&<p style={{margin:"6px 0 0",fontSize:"12px",color:T.muted}}>{field.boundary?.length>=3?`Boundary set — ${field.boundary.length} corner points`:"No boundary drawn yet."}</p>}
-        {mapOpen&&<div style={{marginTop:"12px"}}><FieldMap key={`${field.id}-map`} boundary={field.boundary||[]} onBoundaryChange={(pts)=>{onUpdateField(field.id,{boundary:pts});setMapOpen(false);}} height={320}/></div>}
+        {mapOpen&&<div style={{marginTop:"12px"}}><FieldMap key={`${field.id}-map`} boundary={field.boundary||[]} onBoundaryChange={(pts)=>{onUpdateField(field.id,{boundary:pts});}} height={320}/></div>}
       </div>
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"10px",marginTop:"4px"}}>
         <h3 style={{fontFamily:"'Playfair Display',serif",fontSize:"16px",margin:0,color:T.gold}}>Activity Log</h3>
