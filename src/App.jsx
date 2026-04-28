@@ -64,6 +64,57 @@ const nowLocal = ()=>{ const d=new Date(); return `${d.getFullYear()}-${String(d
 const fmtDate  = (iso)=>{ try{return new Date(iso).toLocaleString("en-US",{month:"short",day:"numeric",year:"numeric",hour:"2-digit",minute:"2-digit"})}catch{return iso||""} };
 const obj2arr  = (obj)=>obj ? Object.values(obj) : [];
 
+// ── GeoJSON / KML parsers for field import ────────────────────────────
+const parseGeoJSONFields = (text) => {
+  const gj = JSON.parse(text);
+  const features = gj.type==="FeatureCollection" ? gj.features
+                 : gj.type==="Feature"            ? [gj]
+                 : gj.features                    ? gj.features : [];
+  return features
+    .filter(f=>f.geometry&&(f.geometry.type==="Polygon"||f.geometry.type==="MultiPolygon"))
+    .map((f,i)=>{
+      const p=f.properties||{};
+      // Coordinates: GeoJSON is [lng,lat] → we store [lat,lng]
+      let ring;
+      if(f.geometry.type==="Polygon"){
+        ring=f.geometry.coordinates[0];
+      } else {
+        // MultiPolygon — take the largest ring
+        const rings=f.geometry.coordinates.map(poly=>poly[0]);
+        ring=rings.reduce((a,b)=>a.length>b.length?a:b);
+      }
+      const boundary=ring.map(([lng,lat])=>[lat,lng]);
+      // Auto-name from common FSA CLU property names
+      const cluNum = p.clu_number||p.CLU_NUMBER||p.field_number||p.FIELD_NUMBER||p.FLD_NUM||"";
+      const tractNum= p.tract_number||p.TRACT_NUMBER||p.TRACT_NO||"";
+      const label  = p.label||p.LABEL||p.name||p.NAME||"";
+      const name   = label     ? label
+                   : cluNum&&tractNum ? `Tract ${tractNum} Field ${cluNum}`
+                   : cluNum    ? `Field ${cluNum}`
+                   : tractNum  ? `Tract ${tractNum}`
+                   : `Field ${i+1}`;
+      const acres  = p.clu_calculated_acreage||p.CLU_CALCULATED_ACREAGE
+                   ||p.clu_official_acreage  ||p.CLU_OFFICIAL_ACREAGE
+                   ||p.CALCACRES||p.GIS_ACRES||p.acres||p.ACRES||"";
+      const legalDesc = p.legal_description||p.LEGAL_DESCRIPTION||"";
+      return { id:genId(), name, acres:acres?String(Math.round(Number(acres)*10)/10):"", legalDesc, boundary };
+    });
+};
+
+const parseKMLFields = (text) => {
+  const doc=new DOMParser().parseFromString(text,"text/xml");
+  return Array.from(doc.querySelectorAll("Placemark"))
+    .filter(p=>p.querySelector("Polygon"))
+    .map((p,i)=>{
+      const name=p.querySelector("name")?.textContent||`Field ${i+1}`;
+      const coordStr=p.querySelector("Polygon outerBoundaryIs coordinates, Polygon coordinates")?.textContent?.trim()||"";
+      const boundary=coordStr.split(/\s+/).filter(c=>c.includes(","))
+        .map(c=>{ const[lng,lat]=c.split(","); return[parseFloat(lat),parseFloat(lng)]; })
+        .filter(c=>!isNaN(c[0])&&!isNaN(c[1]));
+      return{id:genId(),name,acres:"",legalDesc:"",boundary};
+    });
+};
+
 // ── Design tokens ─────────────────────────────────────────────────────
 const T={
   bg:"#0D0800",panel:"#150E04",card:"#1C1408",cardHov:"#231A0C",
@@ -464,8 +515,196 @@ function AddFieldView({onBack,onSave}){
   );
 }
 
+// ── Import Fields Modal ───────────────────────────────────────────────
+function ImportFieldsModal({onClose,onImport}){
+  const[tab,setTab]     =useState("file");   // "file" | "scan"
+  const[step,setStep]   =useState("upload"); // "upload" | "preview"
+  const[parsed,setParsed]=useState([]);
+  const[names,setNames] =useState({});       // id→name overrides
+  const[sel,setSel]     =useState({});
+  const[err,setErr]     =useState("");
+  const[busy,setBusy]   =useState(false);
+  const[scanNote,setScanNote]=useState("");
+
+  const processFields=(fields)=>{
+    if(!fields.length){setErr("No polygon fields found in this file.");return;}
+    setParsed(fields);
+    setNames(Object.fromEntries(fields.map(f=>[f.id,f.name])));
+    setSel(Object.fromEntries(fields.map(f=>[f.id,true])));
+    setStep("preview");
+  };
+
+  // ── File import ──
+  const handleFile=async(e)=>{
+    const file=e.target.files[0]; if(!file) return;
+    setBusy(true); setErr("");
+    try{
+      const ext=file.name.split(".").pop().toLowerCase();
+      if(ext==="geojson"||ext==="json"){
+        processFields(parseGeoJSONFields(await file.text()));
+      } else if(ext==="kml"){
+        processFields(parseKMLFields(await file.text()));
+      } else {
+        setErr(`Unsupported format: .${ext} — please use .geojson, .json, or .kml`);
+      }
+    }catch(e){ setErr("Could not parse file: "+e.message); }
+    finally{ setBusy(false); }
+  };
+
+  // ── AI image scan ──
+  const handleScan=async(e)=>{
+    const file=e.target.files[0]; if(!file) return;
+    setBusy(true); setErr(""); setScanNote("");
+    try{
+      const base64=await new Promise((res,rej)=>{
+        const r=new FileReader();
+        r.onload=()=>res(r.result.split(",")[1]);
+        r.onerror=rej; r.readAsDataURL(file);
+      });
+      const mediaType=file.type||"image/jpeg";
+      const resp=await fetch("https://api.anthropic.com/v1/messages",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({
+          model:"claude-sonnet-4-20250514",
+          max_tokens:2000,
+          messages:[{role:"user",content:[
+            {type:"image",source:{type:"base64",media_type:mediaType,data:base64}},
+            {type:"text",text:`This is a USDA FSA farm map or aerial photo of agricultural fields in Montana.
+Identify every distinct field or tract boundary visible.
+Use any section lines, township/range labels, road intersections, or landmarks to estimate real-world GPS coordinates.
+If you see T/R/S grid lines with labels, use those — each section is 1 mile × 1 mile (640 acres).
+
+Reply ONLY with valid JSON, no markdown, no explanation:
+{"fields":[{"name":"Field 1","acres":160,"boundary":[[lat,lng],[lat,lng],[lat,lng],[lat,lng]]}],"notes":"confidence note here"}`}
+          ]}]
+        })
+      });
+      const data=await resp.json();
+      const txt=data.content?.filter(b=>b.type==="text").map(b=>b.text).join("")||"";
+      const clean=txt.replace(/```json|```/g,"").trim();
+      const result=JSON.parse(clean);
+      setScanNote(result.notes||"");
+      const fields=(result.fields||[]).map(f=>({
+        id:genId(), name:f.name||"Scanned Field",
+        acres:f.acres?String(f.acres):"", legalDesc:"",
+        boundary:f.boundary||[],
+      }));
+      processFields(fields);
+    }catch(e){ setErr("Scan failed: "+e.message); }
+    finally{ setBusy(false); }
+  };
+
+  const doImport=()=>{
+    onImport(parsed.filter(f=>sel[f.id]).map(f=>({...f,name:names[f.id]||f.name})));
+    onClose();
+  };
+  const allSel=parsed.every(f=>sel[f.id]);
+  const toggleAll=()=>setSel(Object.fromEntries(parsed.map(f=>[f.id,!allSel])));
+
+  const tabBtn=(id,label)=>({
+    ...mkBtn("ghost"), padding:"6px 16px", fontSize:"13px",
+    background:tab===id?T.gold:"transparent",
+    color:tab===id?"#100800":T.muted,
+    border:`1px solid ${tab===id?T.gold:T.border}`,
+    borderRadius:"6px",
+  });
+
+  return(
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.88)",zIndex:200,overflowY:"auto",display:"flex",justifyContent:"center",padding:"20px 12px"}}>
+      <div style={{background:"#150E04",border:`1px solid ${T.borderHi}`,borderRadius:"12px",width:"100%",maxWidth:"620px",padding:"22px",alignSelf:"flex-start",marginTop:"10px"}}>
+
+        {/* Header */}
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"18px"}}>
+          <h2 style={{fontFamily:"'Playfair Display',serif",fontSize:"20px",color:T.gold,margin:0}}>Import Fields</h2>
+          <button style={{...mkBtn("ghost"),padding:"5px 10px"}} onClick={onClose}>✕</button>
+        </div>
+
+        {step==="upload"&&<>
+          {/* Tabs */}
+          <div style={{display:"flex",gap:"8px",marginBottom:"18px"}}>
+            <button style={tabBtn("file","📂 Import File")} onClick={()=>{setTab("file");setErr("");}}>📂 Import File</button>
+            <button style={tabBtn("scan","🤖 Scan Map Image")} onClick={()=>{setTab("scan");setErr("");}}>🤖 Scan Map Image</button>
+          </div>
+
+          {tab==="file"&&(
+            <div>
+              <div style={{background:"#0E0C04",border:`1px dashed ${T.borderHi}`,borderRadius:"8px",padding:"24px",textAlign:"center",marginBottom:"14px"}}>
+                <div style={{fontSize:"32px",marginBottom:"8px"}}>📂</div>
+                <p style={{color:T.text,fontWeight:600,marginBottom:"4px"}}>Drop your FSA / CLU file here</p>
+                <p style={{color:T.muted,fontSize:"12px",marginBottom:"16px"}}>Supports .geojson  ·  .json  ·  .kml</p>
+                <label style={{...mkBtn("primary"),cursor:"pointer"}}>
+                  Choose File
+                  <input type="file" accept=".geojson,.json,.kml" style={{display:"none"}} onChange={handleFile} disabled={busy}/>
+                </label>
+              </div>
+              <div style={{background:"#0A0C04",border:`1px solid #2A2A10`,borderRadius:"8px",padding:"12px",fontSize:"12px",color:T.muted}}>
+                <p style={{margin:"0 0 6px",fontWeight:600,color:"#8A8A50"}}>📋 How to get your FSA file</p>
+                <p style={{margin:"0 0 4px"}}>1. Go to <strong style={{color:T.text}}>fsa.usda.gov</strong> → your local service center</p>
+                <p style={{margin:"0 0 4px"}}>2. Or download from <strong style={{color:T.text}}>datagateway.nrcs.usda.gov</strong></p>
+                <p style={{margin:0}}>3. Request your CLU (Common Land Unit) boundaries as GeoJSON</p>
+              </div>
+            </div>
+          )}
+
+          {tab==="scan"&&(
+            <div>
+              <div style={{background:"#0E0C04",border:`1px dashed ${T.borderHi}`,borderRadius:"8px",padding:"24px",textAlign:"center",marginBottom:"14px"}}>
+                <div style={{fontSize:"32px",marginBottom:"8px"}}>🤖</div>
+                <p style={{color:T.text,fontWeight:600,marginBottom:"4px"}}>Upload a photo of your FSA map</p>
+                <p style={{color:T.muted,fontSize:"12px",marginBottom:"4px"}}>Claude AI will read the section grid and extract field boundaries</p>
+                <p style={{color:"#8A6A30",fontSize:"11px",marginBottom:"16px"}}>Works best with maps showing township/range/section labels</p>
+                <label style={{...mkBtn("primary"),cursor:"pointer"}}>
+                  Choose Image
+                  <input type="file" accept="image/*" style={{display:"none"}} onChange={handleScan} disabled={busy}/>
+                </label>
+              </div>
+              {busy&&(
+                <div style={{textAlign:"center",padding:"16px",color:T.muted,fontSize:"13px"}}>
+                  <div style={{fontSize:"24px",marginBottom:"8px"}}>⏳</div>
+                  Analyzing map image…
+                </div>
+              )}
+            </div>
+          )}
+        </>}
+
+        {step==="preview"&&(
+          <div>
+            {scanNote&&<div style={{background:"#0A0C04",border:`1px solid #2A2A10`,borderRadius:"6px",padding:"10px 12px",marginBottom:"14px",fontSize:"12px",color:"#8A8A50"}}>🤖 {scanNote}</div>}
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"10px"}}>
+              <span style={{color:T.muted,fontSize:"13px"}}>{parsed.length} field{parsed.length!==1?"s":""} found — select which to import</span>
+              <button style={{...mkBtn("ghost"),padding:"4px 10px",fontSize:"12px"}} onClick={toggleAll}>{allSel?"Deselect All":"Select All"}</button>
+            </div>
+            <div style={{maxHeight:"320px",overflowY:"auto",marginBottom:"14px"}}>
+              {parsed.map(f=>(
+                <div key={f.id} style={{display:"flex",gap:"10px",alignItems:"center",background:sel[f.id]?T.card:"#120E06",border:`1px solid ${sel[f.id]?T.borderHi:T.border}`,borderRadius:"8px",padding:"10px 12px",marginBottom:"6px"}}>
+                  <input type="checkbox" checked={!!sel[f.id]} onChange={e=>setSel(s=>({...s,[f.id]:e.target.checked}))} style={{width:"16px",height:"16px",accentColor:T.gold,flexShrink:0}}/>
+                  <div style={{flex:1}}>
+                    <input style={{...S.input,padding:"4px 8px",fontSize:"13px",fontWeight:600,marginBottom:"3px"}} value={names[f.id]||""} onChange={e=>setNames(n=>({...n,[f.id]:e.target.value}))} placeholder="Field name"/>
+                    <span style={{fontSize:"11px",color:T.muted}}>{f.acres&&`${f.acres} ac  ·  `}{f.boundary.length} boundary points{f.legalDesc&&`  ·  ${f.legalDesc}`}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {err&&<p style={{color:"#E05050",fontSize:"12px",margin:"0 0 12px",background:"#1A0808",padding:"8px 12px",borderRadius:"6px"}}>{err}</p>}
+        {busy&&step==="upload"&&tab==="file"&&<p style={{color:T.muted,fontSize:"12px",margin:"0 0 12px"}}>Parsing file…</p>}
+
+        <div style={{display:"flex",gap:"8px",justifyContent:"flex-end"}}>
+          {step==="preview"&&<button style={mkBtn("ghost")} onClick={()=>{setStep("upload");setParsed([]);}}>← Back</button>}
+          <button style={mkBtn("ghost")} onClick={onClose}>Cancel</button>
+          {step==="preview"&&<button style={mkBtn("primary")} onClick={doImport} disabled={!parsed.some(f=>sel[f.id])}>Import {parsed.filter(f=>sel[f.id]).length} Field{parsed.filter(f=>sel[f.id]).length!==1?"s":""}</button>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Home View ─────────────────────────────────────────────────────────
-function HomeView({fields,activities,onSelect,onAdd}){
+function HomeView({fields,activities,onSelect,onAdd,onImport}){
   const[q,setQ]=useState("");
   const filtered=fields.filter(f=>f.name.toLowerCase().includes(q.toLowerCase())||(f.legalDesc||"").toLowerCase().includes(q.toLowerCase()));
   return(
@@ -476,6 +715,7 @@ function HomeView({fields,activities,onSelect,onAdd}){
           <h2 style={{fontFamily:"'Playfair Display',serif",fontSize:"24px",margin:"0 0 4px",color:T.gold}}>FieldLog</h2>
           <p style={{margin:0,fontSize:"13px",color:T.muted}}>{fields.length} field{fields.length!==1?"s":""} · {activities.length} activit{activities.length!==1?"ies":"y"} logged</p>
         </div>
+        <button style={{...mkBtn("ghost"),padding:"10px 16px",fontSize:"14px"}} onClick={onImport}>⬆ Import</button>
         <button style={{...mkBtn("primary"),padding:"10px 20px",fontSize:"14px"}} onClick={onAdd}>+ Add Field</button>
       </div>
       {fields.length>3&&<div style={S.row}><input style={S.input} type="search" placeholder="Search fields…" value={q} onChange={e=>setQ(e.target.value)}/></div>}
@@ -518,7 +758,8 @@ export default function App(){
   const[loading,setLoading]=useState(true);
   const[sync,setSync]      =useState("idle"); // "idle"|"saving"|"saved"|"error"|"offline"
   const[activeField,setAF] =useState(null);
-  const[showAdd,setShowAdd]=useState(false);
+  const[showAdd,setShowAdd] =useState(false);
+  const[showImport,setShowImport]=useState(false);
   const skipSSE=useRef(false);  // prevent SSE echo after our own write
 
   // ── Sync status dot ──────────────────────────────────────
@@ -585,6 +826,9 @@ export default function App(){
   const addField=(f)=>{
     const nf=[...fields,f]; setFields(nf); persist(nf,activities); setView("home");
   };
+  const importFields=(imported)=>{
+    const nf=[...fields,...imported]; setFields(nf); persist(nf,activities);
+  };
   const updateField=(id,u)=>{
     const nf=fields.map(f=>f.id===id?{...f,...u}:f); setFields(nf); persist(nf,activities);
   };
@@ -631,12 +875,13 @@ export default function App(){
       )}
 
       <div style={S.content}>
-        {view==="home"        &&<HomeView fields={fields} activities={activities} onSelect={f=>{setAF(f);setView("fieldDetail");}} onAdd={()=>setView("addField")}/>}
+        {view==="home"        &&<HomeView fields={fields} activities={activities} onSelect={f=>{setAF(f);setView("fieldDetail");}} onAdd={()=>setView("addField")} onImport={()=>setShowImport(true)}/>}
         {view==="addField"    &&<AddFieldView onBack={()=>setView("home")} onSave={addField}/>}
         {view==="fieldDetail" &&curField&&<FieldDetailView field={curField} activities={activities} onBack={()=>setView("home")} onAddActivity={()=>setShowAdd(true)} onDeleteActivity={delActivity} onUpdateField={updateField}/>}
       </div>
 
       {showAdd&&curField&&<AddActivityModal field={curField} onClose={()=>setShowAdd(false)} onSave={addActivity}/>}
+      {showImport&&<ImportFieldsModal onClose={()=>setShowImport(false)} onImport={importFields}/>}
     </div>
   );
 }
