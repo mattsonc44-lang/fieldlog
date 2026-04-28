@@ -3,7 +3,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 // ╔══════════════════════════════════════════════════════════════════════╗
 // ║  FIREBASE CONFIG — paste your project values here                  ║
 // ╠══════════════════════════════════════════════════════════════════════╣
-const FIREBASE_URL = "https://YOUR-PROJECT-default-rtdb.firebaseio.com";
+const FIREBASE_URL = "https://fieldlog-cd3e6-default-rtdb.firebaseio.com";
 const DB_PATH      = "fieldlog";   // root key in Realtime DB
 // ╚══════════════════════════════════════════════════════════════════════╝
 
