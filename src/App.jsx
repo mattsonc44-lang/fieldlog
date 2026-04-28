@@ -605,16 +605,23 @@ function ImportFieldsModal({onClose,onImport}){
           max_tokens:2000,
           messages:[{role:"user",content:[
             {type:"image",source:{type:"base64",media_type:mediaType,data:base64}},
-            {type:"text",text:`This is a farm map showing agricultural fields. 
-Identify each distinct field or tract visible. For each one, extract:
-- The field name or label (tract number, field number, or any written label)
-- The estimated acreage if shown
-- Any legal description if visible (e.g. NW-12-34-15-W4)
+            {type:"text",text:`This is a USDA FSA farm map from Montana.
 
-Do NOT attempt to provide GPS coordinates — just identify the fields from the labels on the map.
+Step 1 — Read every field label from the map: tract numbers, field numbers, legal descriptions (Section-Township-Range), and acreages.
+
+Step 2 — For each field, calculate the four corner GPS coordinates using the Montana PLSS system:
+- Montana Principal Meridian: 45.7764°N, 111.0667°W
+- Baseline runs east-west through the meridian
+- Townships numbered north (N) or south (S) from baseline, each 6 miles (0.08682°lat)
+- Ranges numbered east (E) or west (W) from meridian, each 6 miles
+- Sections are 1×1 mile numbered 1-36 within each township (row 1 starts NE corner)
+- Quarter sections (NW/NE/SW/SE) are 0.5×0.5 mile (160 ac each)
+- Half sections and other splits divide accordingly
+
+Calculate actual corner lat/lng for each field's legal description. Account for section numbering: sections go 1-6 east to west on row 1 (north), then 7-12 west to east on row 2, etc.
 
 Reply ONLY with valid JSON, no markdown:
-{"fields":[{"name":"Field 1","acres":160,"legalDesc":"NW-12-34-15-W4"}],"notes":"brief note about what you found"}`}
+{"fields":[{"name":"Tract 1 Field 1","acres":160,"legalDesc":"NW Sec 12 T34N R15E","boundary":[[lat,lng],[lat,lng],[lat,lng],[lat,lng]]}],"notes":"accuracy note"}`}
           ]}]
         })
       });
@@ -631,13 +638,13 @@ Reply ONLY with valid JSON, no markdown:
       const match=txt.match(/\{[\s\S]*\}/);
       if(!match) throw new Error("No JSON found in response. Raw: "+txt.slice(0,120));
       const result=JSON.parse(match[0]);
-      setScanNote((result.notes||"")+" Fields created without boundaries — open each field to draw its boundary on the satellite map.");
+      setScanNote(result.notes||"");
       const fields=(result.fields||[]).map(f=>({
         id:genId(),
         name:f.name||"Scanned Field",
         acres:f.acres?String(f.acres):"",
         legalDesc:f.legalDesc||"",
-        boundary:[],
+        boundary:Array.isArray(f.boundary)&&f.boundary.length>=3 ? f.boundary : [],
       }));
       processFields(fields);
     }catch(e){ setErr("Scan failed: "+e.message); }
