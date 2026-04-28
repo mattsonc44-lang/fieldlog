@@ -116,6 +116,19 @@ const parseKMLFields = (text) => {
     });
 };
 
+// ── Convex hull for merging field boundaries ──────────────────────────
+const convexHull = (pts) => {
+  if(pts.length<=2) return pts;
+  const s=[...pts].sort((a,b)=>a[1]-b[1]||a[0]-b[0]);
+  const cross=(o,a,b)=>(a[1]-o[1])*(b[0]-o[0])-(a[0]-o[0])*(b[1]-o[1]);
+  const lower=[];
+  for(const p of s){ while(lower.length>=2&&cross(lower[lower.length-2],lower[lower.length-1],p)<=0)lower.pop(); lower.push(p); }
+  const upper=[];
+  for(let i=s.length-1;i>=0;i--){ const p=s[i]; while(upper.length>=2&&cross(upper[upper.length-2],upper[upper.length-1],p)<=0)upper.pop(); upper.push(p); }
+  lower.pop(); upper.pop();
+  return lower.concat(upper);
+};
+
 // ── Design tokens ─────────────────────────────────────────────────────
 const T={
   bg:"#0D0800",panel:"#150E04",card:"#1C1408",cardHov:"#231A0C",
@@ -442,10 +455,10 @@ function AddActivityModal({field,onClose,onSave}){
 }
 
 // ── Field Detail ──────────────────────────────────────────────────────
-function FieldDetailView({field,activities,onBack,onAddActivity,onDeleteActivity,onUpdateField}){
+function FieldDetailView({field,activities,onBack,onAddActivity,onDeleteActivity,onUpdateField,onDeleteField}){
   const[mapOpen,setMapOpen]=useState(field.boundary?.length>=3);const[editName,setEditName]=useState(false);
   const[nameVal,setNameVal]=useState(field.name);const[acresVal,setAcresVal]=useState(field.acres||"");
-  const[filter,setFilter]=useState("all");
+  const[filter,setFilter]=useState("all");const[confirmDelete,setConfirmDelete]=useState(false);
   const all=activities.filter(a=>a.fieldId===field.id);
   const shown=all.filter(a=>filter==="all"||a.type===filter).sort((a,b)=>new Date(b.date)-new Date(a.date));
   const stats=Object.entries(ACTIVITY_META).map(([k,m])=>({...m,key:k,n:all.filter(a=>a.type===k).length})).filter(x=>x.n>0);
@@ -458,7 +471,18 @@ function FieldDetailView({field,activities,onBack,onAddActivity,onDeleteActivity
           :<div style={{display:"flex",gap:"8px",flex:1,alignItems:"center",flexWrap:"wrap"}}><input style={{...S.input,flex:"2 1 160px"}} value={nameVal} onChange={e=>setNameVal(e.target.value)}/><input style={{...S.input,flex:"1 1 80px",width:"auto"}} type="number" placeholder="Acres" value={acresVal} onChange={e=>setAcresVal(e.target.value)}/><button style={{...mkBtn("primary"),padding:"6px 12px",fontSize:"12px"}} onClick={()=>{onUpdateField(field.id,{name:nameVal,acres:acresVal});setEditName(false);}}>Save</button><button style={{...mkBtn("ghost"),padding:"6px 12px",fontSize:"12px"}} onClick={()=>setEditName(false)}>Cancel</button></div>
         }
         <button style={mkBtn("primary")} onClick={onAddActivity}>+ Log Activity</button>
+        <button style={{...mkBtn("danger"),padding:"6px 12px",fontSize:"12px"}} onClick={()=>setConfirmDelete(true)}>🗑 Delete</button>
       </div>
+
+      {/* Delete confirmation */}
+      {confirmDelete&&(
+        <div style={{...S.card,background:"#1A0808",border:`1px solid #5A1A1A`,marginBottom:"16px",display:"flex",alignItems:"center",gap:"12px",flexWrap:"wrap"}}>
+          <span style={{flex:1,fontSize:"13px",color:"#FFAAAA"}}>Delete <strong>{field.name}</strong> and all its activity logs? This cannot be undone.</span>
+          <button style={{...mkBtn("danger"),padding:"6px 14px",fontSize:"12px"}} onClick={()=>onDeleteField(field.id)}>Yes, Delete</button>
+          <button style={{...mkBtn("ghost"),padding:"6px 12px",fontSize:"12px"}} onClick={()=>setConfirmDelete(false)}>Cancel</button>
+        </div>
+      )}
+
       {stats.length>0&&<div style={{display:"flex",gap:"8px",flexWrap:"wrap",marginBottom:"14px"}}>{stats.map(s=><div key={s.key} style={{padding:"5px 12px",borderRadius:"20px",background:T.card,border:`1px solid ${s.color}40`,fontSize:"12px",display:"flex",gap:"5px",alignItems:"center"}}><span>{s.icon}</span><span style={{color:s.color,fontWeight:700}}>{s.n}×</span><span style={{color:T.muted}}>{s.label}</span></div>)}</div>}
       <div style={S.card}>
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
@@ -518,14 +542,15 @@ function AddFieldView({onBack,onSave}){
 
 // ── Import Fields Modal ───────────────────────────────────────────────
 function ImportFieldsModal({onClose,onImport}){
-  const[tab,setTab]     =useState("file");   // "file" | "scan"
-  const[step,setStep]   =useState("upload"); // "upload" | "preview"
+  const[tab,setTab]      =useState("file");
+  const[step,setStep]    =useState("upload");
   const[parsed,setParsed]=useState([]);
-  const[names,setNames] =useState({});       // id→name overrides
-  const[sel,setSel]     =useState({});
-  const[err,setErr]     =useState("");
-  const[busy,setBusy]   =useState(false);
+  const[names,setNames]  =useState({});
+  const[sel,setSel]      =useState({});
+  const[err,setErr]      =useState("");
+  const[busy,setBusy]    =useState(false);
   const[scanNote,setScanNote]=useState("");
+  const[mergeName,setMergeName]=useState("");
 
   const processFields=(fields)=>{
     if(!fields.length){setErr("No polygon fields found in this file.");return;}
@@ -580,13 +605,16 @@ function ImportFieldsModal({onClose,onImport}){
           max_tokens:2000,
           messages:[{role:"user",content:[
             {type:"image",source:{type:"base64",media_type:mediaType,data:base64}},
-            {type:"text",text:`This is a USDA FSA farm map or aerial photo of agricultural fields in Montana.
-Identify every distinct field or tract boundary visible.
-Use any section lines, township/range labels, road intersections, or landmarks to estimate real-world GPS coordinates.
-If you see T/R/S grid lines with labels, use those — each section is 1 mile × 1 mile (640 acres).
+            {type:"text",text:`This is a farm map showing agricultural fields. 
+Identify each distinct field or tract visible. For each one, extract:
+- The field name or label (tract number, field number, or any written label)
+- The estimated acreage if shown
+- Any legal description if visible (e.g. NW-12-34-15-W4)
 
-Reply ONLY with valid JSON, no markdown, no explanation:
-{"fields":[{"name":"Field 1","acres":160,"boundary":[[lat,lng],[lat,lng],[lat,lng],[lat,lng]]}],"notes":"confidence note here"}`}
+Do NOT attempt to provide GPS coordinates — just identify the fields from the labels on the map.
+
+Reply ONLY with valid JSON, no markdown:
+{"fields":[{"name":"Field 1","acres":160,"legalDesc":"NW-12-34-15-W4"}],"notes":"brief note about what you found"}`}
           ]}]
         })
       });
@@ -603,11 +631,13 @@ Reply ONLY with valid JSON, no markdown, no explanation:
       const match=txt.match(/\{[\s\S]*\}/);
       if(!match) throw new Error("No JSON found in response. Raw: "+txt.slice(0,120));
       const result=JSON.parse(match[0]);
-      setScanNote(result.notes||"");
+      setScanNote((result.notes||"")+" Fields created without boundaries — open each field to draw its boundary on the satellite map.");
       const fields=(result.fields||[]).map(f=>({
-        id:genId(), name:f.name||"Scanned Field",
-        acres:f.acres?String(f.acres):"", legalDesc:"",
-        boundary:f.boundary||[],
+        id:genId(),
+        name:f.name||"Scanned Field",
+        acres:f.acres?String(f.acres):"",
+        legalDesc:f.legalDesc||"",
+        boundary:[],
       }));
       processFields(fields);
     }catch(e){ setErr("Scan failed: "+e.message); }
@@ -620,6 +650,29 @@ Reply ONLY with valid JSON, no markdown, no explanation:
   };
   const allSel=parsed.every(f=>sel[f.id]);
   const toggleAll=()=>setSel(Object.fromEntries(parsed.map(f=>[f.id,!allSel])));
+
+  const selCount=parsed.filter(f=>sel[f.id]).length;
+
+  const doMerge=()=>{
+    const toMerge=parsed.filter(f=>sel[f.id]);
+    if(toMerge.length<2) return;
+    const allPts=toMerge.flatMap(f=>f.boundary);
+    const hull=convexHull(allPts);
+    const totalAcres=toMerge.reduce((s,f)=>s+(parseFloat(f.acres)||0),0);
+    const newField={
+      id:genId(),
+      name:mergeName||toMerge.map(f=>names[f.id]||f.name).join(" + "),
+      acres:totalAcres?String(Math.round(totalAcres*10)/10):"",
+      legalDesc:"",
+      boundary:hull,
+    };
+    const remaining=parsed.filter(f=>!sel[f.id]);
+    const next=[...remaining,newField];
+    setParsed(next);
+    setNames(n=>({...n,[newField.id]:newField.name}));
+    setSel({[newField.id]:true});
+    setMergeName("");
+  };
 
   const tabBtn=(id,label)=>({
     ...mkBtn("ghost"), padding:"6px 16px", fontSize:"13px",
@@ -695,6 +748,16 @@ Reply ONLY with valid JSON, no markdown, no explanation:
               <span style={{color:T.muted,fontSize:"13px"}}>{parsed.length} field{parsed.length!==1?"s":""} found — select which to import</span>
               <button style={{...mkBtn("ghost"),padding:"4px 10px",fontSize:"12px"}} onClick={toggleAll}>{allSel?"Deselect All":"Select All"}</button>
             </div>
+
+            {/* Merge bar — shows when 2+ fields are checked */}
+            {selCount>=2&&(
+              <div style={{display:"flex",gap:"8px",alignItems:"center",background:"#0C1020",border:`1px solid #2A3060`,borderRadius:"8px",padding:"10px 12px",marginBottom:"10px",flexWrap:"wrap"}}>
+                <span style={{fontSize:"12px",color:"#6080C0",fontWeight:700}}>🔗 Merge {selCount} selected fields</span>
+                <input style={{...S.input,flex:"1 1 160px",padding:"5px 10px",fontSize:"12px"}} placeholder="Name for merged field (optional)" value={mergeName} onChange={e=>setMergeName(e.target.value)}/>
+                <button style={{...mkBtn("primary"),padding:"6px 14px",fontSize:"12px",background:"#4A6AC0",color:"#fff"}} onClick={doMerge}>Merge →</button>
+              </div>
+            )}
+
             <div style={{maxHeight:"320px",overflowY:"auto",marginBottom:"14px"}}>
               {parsed.map(f=>(
                 <div key={f.id} style={{display:"flex",gap:"10px",alignItems:"center",background:sel[f.id]?T.card:"#120E06",border:`1px solid ${sel[f.id]?T.borderHi:T.border}`,borderRadius:"8px",padding:"10px 12px",marginBottom:"6px"}}>
@@ -857,6 +920,11 @@ export default function App(){
   const delActivity=(id)=>{
     const na=activities.filter(a=>a.id!==id); setActs(na); persist(fields,na);
   };
+  const deleteField=(id)=>{
+    const nf=fields.filter(f=>f.id!==id);
+    const na=activities.filter(a=>a.fieldId!==id);
+    setFields(nf); setActs(na); persist(nf,na); setView("home");
+  };
 
   const curField=activeField?fields.find(f=>f.id===activeField.id)||activeField:null;
 
@@ -896,7 +964,7 @@ export default function App(){
       <div style={S.content}>
         {view==="home"        &&<HomeView fields={fields} activities={activities} onSelect={f=>{setAF(f);setView("fieldDetail");}} onAdd={()=>setView("addField")} onImport={()=>setShowImport(true)}/>}
         {view==="addField"    &&<AddFieldView onBack={()=>setView("home")} onSave={addField}/>}
-        {view==="fieldDetail" &&curField&&<FieldDetailView field={curField} activities={activities} onBack={()=>setView("home")} onAddActivity={()=>setShowAdd(true)} onDeleteActivity={delActivity} onUpdateField={updateField}/>}
+        {view==="fieldDetail" &&curField&&<FieldDetailView field={curField} activities={activities} onBack={()=>setView("home")} onAddActivity={()=>setShowAdd(true)} onDeleteActivity={delActivity} onUpdateField={updateField} onDeleteField={deleteField}/>}
       </div>
 
       {showAdd&&curField&&<AddActivityModal field={curField} onClose={()=>setShowAdd(false)} onSave={addActivity}/>}
