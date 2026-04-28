@@ -3,8 +3,9 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 // ╔══════════════════════════════════════════════════════════════════════╗
 // ║  FIREBASE CONFIG — paste your project values here                  ║
 // ╠══════════════════════════════════════════════════════════════════════╣
-const FIREBASE_URL = "https://fieldlog-cd3e6-default-rtdb.firebaseio.com";
-const DB_PATH      = "fieldlog";   // root key in Realtime DB
+const FIREBASE_URL    = "https://fieldlog-cd3e6-default-rtdb.firebaseio.com";
+const DB_PATH         = "fieldlog";   // root key in Realtime DB
+const ANTHROPIC_KEY   = (typeof window !== "undefined" && window.__ANTHROPIC_KEY__) || "";
 // ╚══════════════════════════════════════════════════════════════════════╝
 
 const FB_CONFIGURED = !FIREBASE_URL.includes("YOUR-PROJECT");
@@ -564,7 +565,12 @@ function ImportFieldsModal({onClose,onImport}){
       const mediaType=file.type||"image/jpeg";
       const resp=await fetch("https://api.anthropic.com/v1/messages",{
         method:"POST",
-        headers:{"Content-Type":"application/json"},
+        headers:{
+          "Content-Type":"application/json",
+          "x-api-key": ANTHROPIC_KEY,
+          "anthropic-version":"2023-06-01",
+          "anthropic-dangerous-direct-browser-access":"true",
+        },
         body:JSON.stringify({
           model:"claude-sonnet-4-20250514",
           max_tokens:2000,
