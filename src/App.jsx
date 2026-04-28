@@ -41,7 +41,7 @@ const CROPS        = ["Wheat","Durum","Barley","Oats","Canola","Flax","Peas","Le
 const FERT_BLENDS  = ["28-0-0 (UAN)","46-0-0 (Urea)","11-52-0 (MAP)","18-46-0 (DAP)","0-0-60 (Potash)","10-26-26","34-0-0 (AN)","12-40-0","Custom Blend"];
 const CHEMICALS    = ["Glyphosate (Roundup)","2,4-D Amine","MCPA Amine","Lontrel 360","Infinity","Odyssey","Axial","Puma Super","Buctril M","Muster 75DF","Centurion","Tundra","Refine M","Bumper 418 EC","Stratego YLD","Headline","Priaxor","Trivapro","Dimethoate","Matador","Other"];
 const ACTIVITY_META = {
-  seeding:     {label:"Seeding",      icon:"🌱",color:"#C8952A"},
+  seeding:     {label:"Seeding",      icon:"🌱",color:"#8C5408"},
   spraying:    {label:"Spraying",     icon:"💧",color:"#4A90C8"},
   rockPicking: {label:"Rock Picking", icon:"🪨",color:"#9A7060"},
   tillage:     {label:"Tillage",      icon:"⚙️", color:"#6B8F71"},
@@ -131,11 +131,11 @@ const convexHull = (pts) => {
 
 // ── Design tokens ─────────────────────────────────────────────────────
 const T={
-  bg:"#0D0800",panel:"#150E04",card:"#1C1408",cardHov:"#231A0C",
-  border:"#2E2010",borderHi:"#5A3E1A",
-  gold:"#C8952A",goldSoft:"#E0B050",
-  text:"#EDE4D6",muted:"#9A8870",faint:"#5A4A38",
-  green:"#5A8A60",blue:"#4A80A0",danger:"#A03028",
+  bg:"#F4EFE6",panel:"#E8DFD0",card:"#FFFFFF",cardHov:"#F0E8D8",
+  border:"#D8CEBC",borderHi:"#C4A468",
+  gold:"#8C5408",goldSoft:"#A86810",
+  text:"#1E1408",muted:"#7A6645",faint:"#B8A880",
+  green:"#2A5E2A",blue:"#1E5078",danger:"#841A18",
 };
 const S={
   app:   {fontFamily:"'Barlow',sans-serif",background:T.bg,minHeight:"100vh",color:T.text},
@@ -143,7 +143,7 @@ const S={
   content:{padding:"20px",maxWidth:"820px",margin:"0 auto"},
   card:  {background:T.card,border:`1px solid ${T.border}`,borderRadius:"10px",padding:"16px",marginBottom:"12px"},
   label: {display:"block",fontSize:"11px",color:T.muted,textTransform:"uppercase",letterSpacing:"0.9px",fontWeight:700,marginBottom:"5px"},
-  input: {width:"100%",background:"#1C1408",border:`1px solid ${T.borderHi}`,borderRadius:"6px",padding:"8px 11px",color:T.text,fontSize:"14px",fontFamily:"'Barlow',sans-serif",outline:"none",boxSizing:"border-box"},
+  input: {width:"100%",background:"#FFFFFF",border:`1px solid ${T.borderHi}`,borderRadius:"6px",padding:"8px 11px",color:T.text,fontSize:"14px",fontFamily:"'Barlow',sans-serif",outline:"none",boxSizing:"border-box"},
   row:   {marginBottom:"14px"},
   g2:    {display:"grid",gridTemplateColumns:"1fr 1fr",gap:"12px"},
   g3:    {display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"10px"},
@@ -155,7 +155,7 @@ const mkBtn=(v="primary")=>({
   border:v==="ghost"?`1px solid ${T.border}`:v==="outline"?`1px solid ${T.gold}`:"none",
   cursor:"pointer",fontSize:"13px",fontWeight:600,fontFamily:"'Barlow',sans-serif",
   background:v==="primary"?T.gold:v==="danger"?T.danger:"transparent",
-  color:v==="primary"?"#100800":v==="danger"?"#FFCCCC":v==="outline"?T.gold:T.muted,
+  color:v==="primary"?"#1E0800":v==="danger"?"#FFCCCC":v==="outline"?T.gold:T.muted,
 });
 
 // ╔═══════════════════════════════════════════════════════════╗
@@ -249,14 +249,14 @@ function FieldMap({boundary=[],onBoundaryChange,height=350}){
           <button style={{...mkBtn("ghost"),padding:"2px 10px",fontSize:"18px",lineHeight:1}} onClick={()=>setZoom(z=>Math.min(18,z+1))}>+</button>
         </div>
       </div>
-      <div ref={wrapRef} style={{position:"relative",width:"100%",height:`${H}px`,borderRadius:"8px",overflow:"hidden",border:`1px solid ${T.borderHi}`,background:"#1A1204",cursor:"crosshair",userSelect:"none"}}
+      <div ref={wrapRef} style={{position:"relative",width:"100%",height:`${H}px`,borderRadius:"8px",overflow:"hidden",border:`1px solid ${T.borderHi}`,background:"#C8C8C0",cursor:"crosshair",userSelect:"none"}}
         onMouseDown={onMD} onMouseMove={onMM} onMouseUp={onMU} onMouseLeave={onMU}
         onClick={onClick} onWheel={onWheel}
         onTouchStart={onTS} onTouchMove={onTM} onTouchEnd={onTE}>
         {tiles.map(t=><img key={t.key} src={t.src} alt="" draggable={false} style={{position:"absolute",left:`${t.left}px`,top:`${t.top}px`,width:"256px",height:"256px",display:"block",pointerEvents:"none"}}/>)}
         <svg style={{position:"absolute",inset:0,width:"100%",height:"100%",pointerEvents:"none",overflow:"visible"}}>
-          {nPts>=3&&<polygon points={polyStr} fill="rgba(200,149,42,0.22)" stroke="#C8952A" strokeWidth="2.5" strokeLinejoin="round"/>}
-          {nPts===2&&(()=>{const[ax,ay]=ll2px(pts[0][0],pts[0][1]),[bx,by]=ll2px(pts[1][0],pts[1][1]);return<line x1={ax} y1={ay} x2={bx} y2={by} stroke="#C8952A" strokeWidth="2.5"/>;})()}
+          {nPts>=3&&<polygon points={polyStr} fill="rgba(200,149,42,0.22)" stroke="#8C5408" strokeWidth="2.5" strokeLinejoin="round"/>}
+          {nPts===2&&(()=>{const[ax,ay]=ll2px(pts[0][0],pts[0][1]),[bx,by]=ll2px(pts[1][0],pts[1][1]);return<line x1={ax} y1={ay} x2={bx} y2={by} stroke="#8C5408" strokeWidth="2.5"/>;})()}
           {pts.map(([la,ln],i)=>{const[px,py]=ll2px(la,ln);return(<g key={i}><circle cx={px} cy={py} r={6} fill="#E8B84B" stroke="#A07020" strokeWidth={2}/><text x={px} y={py} textAnchor="middle" dominantBaseline="middle" fill="#1A0E04" fontSize={9} fontWeight="bold">{i+1}</text></g>);})}
         </svg>
         <div style={{position:"absolute",bottom:0,right:0,background:"rgba(0,0,0,0.55)",color:"#bbb",fontSize:"9px",padding:"2px 6px",pointerEvents:"none"}}>© Esri, DigitalGlobe, GeoEye</div>
@@ -285,7 +285,7 @@ function SeedingForm({v,set}){
         <div style={S.row}><label style={S.label}>Seed Rate (lbs / ac)</label><input style={S.input} type="number" step="0.1" placeholder="e.g. 90" value={v.seedRate||""} onChange={e=>set({...v,seedRate:e.target.value})}/></div>
         <div style={S.row}><label style={S.label}>Total Seed (lbs)</label><input style={S.input} type="number" step="1" placeholder="e.g. 14400" value={v.totalSeed||""} onChange={e=>set({...v,totalSeed:e.target.value})}/></div>
       </div>
-      <div style={{background:"#120C04",border:`1px solid #2A1C08`,borderRadius:"8px",padding:"14px",marginBottom:"14px"}}>
+      <div style={{background:"#FBF6EC",border:`1px solid #E0CFA0`,borderRadius:"8px",padding:"14px",marginBottom:"14px"}}>
         <p style={{margin:"0 0 12px",fontSize:"11px",color:T.muted,textTransform:"uppercase",letterSpacing:"0.9px",fontWeight:700}}>Seed-Placed Fertilizer</p>
         <div style={S.g2}>
           <div style={S.row}><label style={S.label}>Fertilizer Rate (lbs / ac)</label><input style={S.input} type="number" step="0.1" placeholder="e.g. 40" value={v.fertRate||""} onChange={e=>set({...v,fertRate:e.target.value})}/></div>
@@ -299,8 +299,8 @@ function SeedingForm({v,set}){
         {v.fertBlend==="Custom Blend"&&<div style={S.row}><label style={S.label}>Custom Blend Analysis</label><input style={S.input} type="text" placeholder="e.g. 16-20-10-5S" value={v.fertCustom||""} onChange={e=>set({...v,fertCustom:e.target.value})}/></div>}
       </div>
       {v.crop==="Peas"&&(
-        <div style={{background:"#0C1208",border:`1px solid #1A2A14`,borderRadius:"8px",padding:"14px",marginBottom:"14px"}}>
-          <p style={{margin:"0 0 12px",fontSize:"11px",color:"#6A9A60",textTransform:"uppercase",letterSpacing:"0.9px",fontWeight:700}}>🧪 Inoculant (Peas)</p>
+        <div style={{background:"#EFF7ED",border:`1px solid #A8CCA4`,borderRadius:"8px",padding:"14px",marginBottom:"14px"}}>
+          <p style={{margin:"0 0 12px",fontSize:"11px",color:"#2A6A28",textTransform:"uppercase",letterSpacing:"0.9px",fontWeight:700}}>🧪 Inoculant (Peas)</p>
           <div style={S.g2}>
             <div style={S.row}><label style={S.label}>Inoculant Product</label><input style={S.input} type="text" placeholder="e.g. Nodulator PRO, TagTeam" value={v.inoculantProduct||""} onChange={e=>set({...v,inoculantProduct:e.target.value})}/></div>
             <div style={S.row}><label style={S.label}>Application Rate</label><input style={S.input} type="text" placeholder="e.g. 4 oz / cwt" value={v.inoculantRate||""} onChange={e=>set({...v,inoculantRate:e.target.value})}/></div>
@@ -327,14 +327,14 @@ function SprayingForm({v,set}){
         <div style={S.row}><label style={S.label}>Water Volume (gal / ac)</label><input style={S.input} type="number" step="0.5" placeholder="e.g. 10" value={v.waterVol||""} onChange={e=>set({...v,waterVol:e.target.value})}/></div>
         <div style={S.row}><label style={S.label}>Sprayer / Equipment</label><input style={S.input} type="text" placeholder="e.g. Case 4430" value={v.equipment||""} onChange={e=>set({...v,equipment:e.target.value})}/></div>
       </div>
-      <div style={{background:"#0A0C14",border:`1px solid #1A2030`,borderRadius:"8px",padding:"14px",marginBottom:"14px"}}>
+      <div style={{background:"#EEF3FA",border:`1px solid #A8C0DC",borderRadius:"8px",padding:"14px",marginBottom:"14px"}}>
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"12px"}}>
-          <p style={{margin:0,fontSize:"11px",color:"#6080A0",textTransform:"uppercase",letterSpacing:"0.9px",fontWeight:700}}>💧 Tank Mix</p>
-          <button style={{...mkBtn("ghost"),padding:"5px 12px",fontSize:"12px",borderColor:"#4A80A0",color:"#4A90C8"}} onClick={add}>+ Add Chemical</button>
+          <p style={{margin:0,fontSize:"11px",color:"#2A5080",textTransform:"uppercase",letterSpacing:"0.9px",fontWeight:700}}>💧 Tank Mix</p>
+          <button style={{...mkBtn("ghost"),padding:"5px 12px",fontSize:"12px",borderColor:"#1E5078",color:"#4A90C8"}} onClick={add}>+ Add Chemical</button>
         </div>
         {mix.length===0&&<div style={{textAlign:"center",padding:"18px",color:T.faint,fontSize:"13px",border:`1px dashed ${T.border}`,borderRadius:"6px"}}>Click "+ Add Chemical" to build your tank mix</div>}
         {mix.map((c,i)=>(
-          <div key={c.id} style={{background:"#12141C",border:`1px solid #1E2434`,borderRadius:"8px",padding:"12px",marginBottom:"8px"}}>
+          <div key={c.id} style={{background:"#F4F6FB",border:`1px solid #C0CCE0`,borderRadius:"8px",padding:"12px",marginBottom:"8px"}}>
             <div style={{display:"flex",gap:"8px",alignItems:"flex-end",flexWrap:"wrap"}}>
               <div style={{flex:"3 1 160px"}}>
                 <label style={S.label}>Chemical #{i+1}</label>
@@ -424,7 +424,7 @@ function AddActivityModal({field,onClose,onSave}){
   const save=()=>{ if(!type){setErr("Please select an activity type.");return;} onSave({id:genId(),fieldId:field.id,type,date,data,notes}); onClose(); };
   return(
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.88)",zIndex:200,overflowY:"auto",display:"flex",justifyContent:"center",padding:"20px 12px"}}>
-      <div style={{background:"#150E04",border:`1px solid ${T.borderHi}`,borderRadius:"12px",width:"100%",maxWidth:"620px",padding:"22px",alignSelf:"flex-start",marginTop:"10px"}}>
+      <div style={{background:"#E8DFD0",border:`1px solid ${T.borderHi}`,borderRadius:"12px",width:"100%",maxWidth:"620px",padding:"22px",alignSelf:"flex-start",marginTop:"10px"}}>
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"18px"}}>
           <h2 style={{fontFamily:"'Playfair Display',serif",fontSize:"20px",color:T.gold,margin:0}}>Log Activity — <span style={{color:T.text}}>{field.name}</span></h2>
           <button style={{...mkBtn("ghost"),padding:"5px 10px"}} onClick={onClose}>✕</button>
@@ -434,7 +434,7 @@ function AddActivityModal({field,onClose,onSave}){
           <label style={S.label}>Activity Type</label>
           <div style={S.g3}>
             {Object.entries(ACTIVITY_META).map(([k,m])=>(
-              <button key={k} style={{...mkBtn("ghost"),justifyContent:"center",flexDirection:"column",padding:"10px 4px",fontSize:"11px",gap:"3px",background:type===k?m.color:T.card,color:type===k?"#100800":T.muted,border:`1px solid ${type===k?m.color:T.border}`,borderRadius:"8px"}} onClick={()=>{setType(k);setData({});setErr("");}}>
+              <button key={k} style={{...mkBtn("ghost"),justifyContent:"center",flexDirection:"column",padding:"10px 4px",fontSize:"11px",gap:"3px",background:type===k?m.color:T.card,color:type===k?"#FDFAF4":T.muted,border:`1px solid ${type===k?m.color:T.border}`,borderRadius:"8px"}} onClick={()=>{setType(k);setData({});setErr("");}}>
                 <span style={{fontSize:"20px"}}>{m.icon}</span><span style={{fontWeight:700}}>{m.label}</span>
               </button>
             ))}
@@ -476,8 +476,8 @@ function FieldDetailView({field,activities,onBack,onAddActivity,onDeleteActivity
 
       {/* Delete confirmation */}
       {confirmDelete&&(
-        <div style={{...S.card,background:"#1A0808",border:`1px solid #5A1A1A`,marginBottom:"16px",display:"flex",alignItems:"center",gap:"12px",flexWrap:"wrap"}}>
-          <span style={{flex:1,fontSize:"13px",color:"#FFAAAA"}}>Delete <strong>{field.name}</strong> and all its activity logs? This cannot be undone.</span>
+        <div style={{...S.card,background:"#FDF0EE",border:`1px solid #E0A0A0`,marginBottom:"16px",display:"flex",alignItems:"center",gap:"12px",flexWrap:"wrap"}}>
+          <span style={{flex:1,fontSize:"13px",color:"#8A1010"}}>Delete <strong>{field.name}</strong> and all its activity logs? This cannot be undone.</span>
           <button style={{...mkBtn("danger"),padding:"6px 14px",fontSize:"12px"}} onClick={()=>onDeleteField(field.id)}>Yes, Delete</button>
           <button style={{...mkBtn("ghost"),padding:"6px 12px",fontSize:"12px"}} onClick={()=>setConfirmDelete(false)}>Cancel</button>
         </div>
@@ -582,21 +582,34 @@ function ImportFieldsModal({onClose,onImport}){
     const file=e.target.files[0]; if(!file) return;
     setBusy(true); setErr(""); setScanNote("");
     try{
-      // Check key is present
-      if(!ANTHROPIC_KEY){
-        throw new Error("API key not configured — check your ANTHROPIC_KEY environment variable in Netlify.");
-      }
+      if(!ANTHROPIC_KEY) throw new Error("API key not configured — check ANTHROPIC_KEY in Netlify environment variables.");
+
+      // Resize to max 1600px JPEG to keep payload manageable
       const base64=await new Promise((res,rej)=>{
-        const r=new FileReader();
-        r.onload=()=>res(r.result.split(",")[1]);
-        r.onerror=rej; r.readAsDataURL(file);
+        const img=new Image();
+        const url=URL.createObjectURL(file);
+        img.onload=()=>{
+          const MAX=1600;
+          const scale=Math.min(1,MAX/Math.max(img.width,img.height));
+          const c=document.createElement("canvas");
+          c.width=Math.round(img.width*scale);
+          c.height=Math.round(img.height*scale);
+          c.getContext("2d").drawImage(img,0,0,c.width,c.height);
+          c.toBlob(blob=>{
+            const r=new FileReader();
+            r.onload=()=>res(r.result.split(",")[1]);
+            r.onerror=rej; r.readAsDataURL(blob);
+          },"image/jpeg",0.82);
+          URL.revokeObjectURL(url);
+        };
+        img.onerror=rej; img.src=url;
       });
-      const mediaType=file.type||"image/jpeg";
+
       const resp=await fetch("https://api.anthropic.com/v1/messages",{
         method:"POST",
         headers:{
           "Content-Type":"application/json",
-          "x-api-key": ANTHROPIC_KEY,
+          "x-api-key":ANTHROPIC_KEY,
           "anthropic-version":"2023-06-01",
           "anthropic-dangerous-direct-browser-access":"true",
         },
@@ -604,47 +617,39 @@ function ImportFieldsModal({onClose,onImport}){
           model:"claude-sonnet-4-20250514",
           max_tokens:2000,
           messages:[{role:"user",content:[
-            {type:"image",source:{type:"base64",media_type:mediaType,data:base64}},
+            {type:"image",source:{type:"base64",media_type:"image/jpeg",data:base64}},
             {type:"text",text:`This is a USDA FSA farm map from Montana.
 
-Step 1 — Read every field label from the map: tract numbers, field numbers, legal descriptions (Section-Township-Range), and acreages.
+Step 1 — Read every field label: tract numbers, field numbers, legal descriptions (Section-Township-Range), and acreages.
 
-Step 2 — For each field, calculate the four corner GPS coordinates using the Montana PLSS system:
+Step 2 — For each field, calculate four corner GPS coordinates using the Montana PLSS system:
 - Montana Principal Meridian: 45.7764°N, 111.0667°W
-- Baseline runs east-west through the meridian
-- Townships numbered north (N) or south (S) from baseline, each 6 miles (0.08682°lat)
-- Ranges numbered east (E) or west (W) from meridian, each 6 miles
-- Sections are 1×1 mile numbered 1-36 within each township (row 1 starts NE corner)
-- Quarter sections (NW/NE/SW/SE) are 0.5×0.5 mile (160 ac each)
-- Half sections and other splits divide accordingly
+- Townships go north (N) from baseline, each 6 miles (0.08682° lat)
+- Ranges go east (E) or west (W) from meridian, each 6 miles
+- Sections are 1×1 mile, numbered 1-36 (row 1 north: 6,5,4,3,2,1 west to east; row 2: 7,8,9,10,11,12 west to east; etc.)
+- Quarter sections (NW/NE/SW/SE) are 0.5×0.5 mile (160 ac)
 
-Calculate actual corner lat/lng for each field's legal description. Account for section numbering: sections go 1-6 east to west on row 1 (north), then 7-12 west to east on row 2, etc.
-
-Reply ONLY with valid JSON, no markdown:
+Reply ONLY with valid JSON, no markdown fences:
 {"fields":[{"name":"Tract 1 Field 1","acres":160,"legalDesc":"NW Sec 12 T34N R15E","boundary":[[lat,lng],[lat,lng],[lat,lng],[lat,lng]]}],"notes":"accuracy note"}`}
           ]}]
         })
       });
-      // Check HTTP status first
+
       if(!resp.ok){
-        const errBody=await resp.text();
-        throw new Error(`API returned ${resp.status}: ${errBody.slice(0,200)}`);
+        const body=await resp.text();
+        throw new Error(`API ${resp.status}: ${body.slice(0,300)}`);
       }
       const data=await resp.json();
-      // Extract text content
       const txt=(data.content||[]).filter(b=>b.type==="text").map(b=>b.text).join("").trim();
-      if(!txt) throw new Error("Empty response from API");
-      // Pull out the JSON object even if surrounded by extra text
+      if(!txt) throw new Error("Empty response — check API key and credits at console.anthropic.com");
       const match=txt.match(/\{[\s\S]*\}/);
-      if(!match) throw new Error("No JSON found in response. Raw: "+txt.slice(0,120));
+      if(!match) throw new Error("Response wasn't JSON. Got: "+txt.slice(0,200));
       const result=JSON.parse(match[0]);
       setScanNote(result.notes||"");
       const fields=(result.fields||[]).map(f=>({
-        id:genId(),
-        name:f.name||"Scanned Field",
-        acres:f.acres?String(f.acres):"",
-        legalDesc:f.legalDesc||"",
-        boundary:Array.isArray(f.boundary)&&f.boundary.length>=3 ? f.boundary : [],
+        id:genId(), name:f.name||"Scanned Field",
+        acres:f.acres?String(f.acres):"", legalDesc:f.legalDesc||"",
+        boundary:Array.isArray(f.boundary)&&f.boundary.length>=3?f.boundary:[],
       }));
       processFields(fields);
     }catch(e){ setErr("Scan failed: "+e.message); }
@@ -684,14 +689,14 @@ Reply ONLY with valid JSON, no markdown:
   const tabBtn=(id,label)=>({
     ...mkBtn("ghost"), padding:"6px 16px", fontSize:"13px",
     background:tab===id?T.gold:"transparent",
-    color:tab===id?"#100800":T.muted,
+    color:tab===id?"#FDFAF4":T.muted,
     border:`1px solid ${tab===id?T.gold:T.border}`,
     borderRadius:"6px",
   });
 
   return(
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.88)",zIndex:200,overflowY:"auto",display:"flex",justifyContent:"center",padding:"20px 12px"}}>
-      <div style={{background:"#150E04",border:`1px solid ${T.borderHi}`,borderRadius:"12px",width:"100%",maxWidth:"620px",padding:"22px",alignSelf:"flex-start",marginTop:"10px"}}>
+      <div style={{background:"#E8DFD0",border:`1px solid ${T.borderHi}`,borderRadius:"12px",width:"100%",maxWidth:"620px",padding:"22px",alignSelf:"flex-start",marginTop:"10px"}}>
 
         {/* Header */}
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"18px"}}>
@@ -708,7 +713,7 @@ Reply ONLY with valid JSON, no markdown:
 
           {tab==="file"&&(
             <div>
-              <div style={{background:"#0E0C04",border:`1px dashed ${T.borderHi}`,borderRadius:"8px",padding:"24px",textAlign:"center",marginBottom:"14px"}}>
+              <div style={{background:"#F8F4EC",border:`1px dashed ${T.borderHi}`,borderRadius:"8px",padding:"24px",textAlign:"center",marginBottom:"14px"}}>
                 <div style={{fontSize:"32px",marginBottom:"8px"}}>📂</div>
                 <p style={{color:T.text,fontWeight:600,marginBottom:"4px"}}>Drop your FSA / CLU file here</p>
                 <p style={{color:T.muted,fontSize:"12px",marginBottom:"16px"}}>Supports .geojson  ·  .json  ·  .kml</p>
@@ -717,8 +722,8 @@ Reply ONLY with valid JSON, no markdown:
                   <input type="file" accept=".geojson,.json,.kml" style={{display:"none"}} onChange={handleFile} disabled={busy}/>
                 </label>
               </div>
-              <div style={{background:"#0A0C04",border:`1px solid #2A2A10`,borderRadius:"8px",padding:"12px",fontSize:"12px",color:T.muted}}>
-                <p style={{margin:"0 0 6px",fontWeight:600,color:"#8A8A50"}}>📋 How to get your FSA file</p>
+              <div style={{background:"#F5F5EC",border:`1px solid #D8D8B0`,borderRadius:"8px",padding:"12px",fontSize:"12px",color:T.muted}}>
+                <p style={{margin:"0 0 6px",fontWeight:600,color:"#6A6830"}}>📋 How to get your FSA file</p>
                 <p style={{margin:"0 0 4px"}}>1. Go to <strong style={{color:T.text}}>fsa.usda.gov</strong> → your local service center</p>
                 <p style={{margin:"0 0 4px"}}>2. Or download from <strong style={{color:T.text}}>datagateway.nrcs.usda.gov</strong></p>
                 <p style={{margin:0}}>3. Request your CLU (Common Land Unit) boundaries as GeoJSON</p>
@@ -728,7 +733,7 @@ Reply ONLY with valid JSON, no markdown:
 
           {tab==="scan"&&(
             <div>
-              <div style={{background:"#0E0C04",border:`1px dashed ${T.borderHi}`,borderRadius:"8px",padding:"24px",textAlign:"center",marginBottom:"14px"}}>
+              <div style={{background:"#F8F4EC",border:`1px dashed ${T.borderHi}`,borderRadius:"8px",padding:"24px",textAlign:"center",marginBottom:"14px"}}>
                 <div style={{fontSize:"32px",marginBottom:"8px"}}>🤖</div>
                 <p style={{color:T.text,fontWeight:600,marginBottom:"4px"}}>Upload a photo of your FSA map</p>
                 <p style={{color:T.muted,fontSize:"12px",marginBottom:"4px"}}>Claude AI will read the section grid and extract field boundaries</p>
@@ -750,7 +755,7 @@ Reply ONLY with valid JSON, no markdown:
 
         {step==="preview"&&(
           <div>
-            {scanNote&&<div style={{background:"#0A0C04",border:`1px solid #2A2A10`,borderRadius:"6px",padding:"10px 12px",marginBottom:"14px",fontSize:"12px",color:"#8A8A50"}}>🤖 {scanNote}</div>}
+            {scanNote&&<div style={{background:"#F5F5EC",border:`1px solid #D8D8B0`,borderRadius:"6px",padding:"10px 12px",marginBottom:"14px",fontSize:"12px",color:"#6A6830"}}>🤖 {scanNote}</div>}
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"10px"}}>
               <span style={{color:T.muted,fontSize:"13px"}}>{parsed.length} field{parsed.length!==1?"s":""} found — select which to import</span>
               <button style={{...mkBtn("ghost"),padding:"4px 10px",fontSize:"12px"}} onClick={toggleAll}>{allSel?"Deselect All":"Select All"}</button>
@@ -758,16 +763,16 @@ Reply ONLY with valid JSON, no markdown:
 
             {/* Merge bar — shows when 2+ fields are checked */}
             {selCount>=2&&(
-              <div style={{display:"flex",gap:"8px",alignItems:"center",background:"#0C1020",border:`1px solid #2A3060`,borderRadius:"8px",padding:"10px 12px",marginBottom:"10px",flexWrap:"wrap"}}>
-                <span style={{fontSize:"12px",color:"#6080C0",fontWeight:700}}>🔗 Merge {selCount} selected fields</span>
+              <div style={{display:"flex",gap:"8px",alignItems:"center",background:"#EDF2FB",border:`1px solid #A0B8E0`,borderRadius:"8px",padding:"10px 12px",marginBottom:"10px",flexWrap:"wrap"}}>
+                <span style={{fontSize:"12px",color:"#2A4A90",fontWeight:700}}>🔗 Merge {selCount} selected fields</span>
                 <input style={{...S.input,flex:"1 1 160px",padding:"5px 10px",fontSize:"12px"}} placeholder="Name for merged field (optional)" value={mergeName} onChange={e=>setMergeName(e.target.value)}/>
-                <button style={{...mkBtn("primary"),padding:"6px 14px",fontSize:"12px",background:"#4A6AC0",color:"#fff"}} onClick={doMerge}>Merge →</button>
+                <button style={{...mkBtn("primary"),padding:"6px 14px",fontSize:"12px",background:"#3A5AAA",color:"#fff"}} onClick={doMerge}>Merge →</button>
               </div>
             )}
 
             <div style={{maxHeight:"320px",overflowY:"auto",marginBottom:"14px"}}>
               {parsed.map(f=>(
-                <div key={f.id} style={{display:"flex",gap:"10px",alignItems:"center",background:sel[f.id]?T.card:"#120E06",border:`1px solid ${sel[f.id]?T.borderHi:T.border}`,borderRadius:"8px",padding:"10px 12px",marginBottom:"6px"}}>
+                <div key={f.id} style={{display:"flex",gap:"10px",alignItems:"center",background:sel[f.id]?T.card:"#F5F0E8",border:`1px solid ${sel[f.id]?T.borderHi:T.border}`,borderRadius:"8px",padding:"10px 12px",marginBottom:"6px"}}>
                   <input type="checkbox" checked={!!sel[f.id]} onChange={e=>setSel(s=>({...s,[f.id]:e.target.checked}))} style={{width:"16px",height:"16px",accentColor:T.gold,flexShrink:0}}/>
                   <div style={{flex:1}}>
                     <input style={{...S.input,padding:"4px 8px",fontSize:"13px",fontWeight:600,marginBottom:"3px"}} value={names[f.id]||""} onChange={e=>setNames(n=>({...n,[f.id]:e.target.value}))} placeholder="Field name"/>
@@ -798,7 +803,7 @@ function HomeView({fields,activities,onSelect,onAdd,onImport}){
   const filtered=fields.filter(f=>f.name.toLowerCase().includes(q.toLowerCase())||(f.legalDesc||"").toLowerCase().includes(q.toLowerCase()));
   return(
     <div>
-      <div style={{background:"linear-gradient(135deg,#1C1004,#0D0800)",border:`1px solid ${T.borderHi}`,borderRadius:"12px",padding:"22px",marginBottom:"20px",display:"flex",alignItems:"center",gap:"16px"}}>
+      <div style={{background:"linear-gradient(135deg,#E8DDD0,#DDD3C0)",border:`1px solid ${T.borderHi}`,borderRadius:"12px",padding:"22px",marginBottom:"20px",display:"flex",alignItems:"center",gap:"16px"}}>
         <div style={{fontSize:"40px"}}>🌾</div>
         <div style={{flex:1}}>
           <h2 style={{fontFamily:"'Playfair Display',serif",fontSize:"24px",margin:"0 0 4px",color:T.gold}}>FieldLog</h2>
@@ -818,7 +823,7 @@ function HomeView({fields,activities,onSelect,onAdd,onImport}){
             onMouseEnter={e=>{e.currentTarget.style.background=T.cardHov;e.currentTarget.style.borderColor=T.borderHi;}}
             onMouseLeave={e=>{e.currentTarget.style.background=T.card;e.currentTarget.style.borderColor=T.border;}}>
             <div style={{display:"flex",gap:"14px",alignItems:"center"}}>
-              <div style={{width:"46px",height:"46px",borderRadius:"8px",background:"#2A1C08",border:`1px solid ${T.borderHi}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:"22px",flexShrink:0}}>🌾</div>
+              <div style={{width:"46px",height:"46px",borderRadius:"8px",background:"#EAE0CC",border:`1px solid ${T.borderHi}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:"22px",flexShrink:0}}>🌾</div>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{fontWeight:700,fontSize:"16px",marginBottom:"2px"}}>{f.name}</div>
                 <div style={{color:T.muted,fontSize:"12px",display:"flex",gap:"8px"}}>{f.acres&&<span>{f.acres} ac</span>}{f.legalDesc&&<><span style={{color:T.faint}}>|</span><span>{f.legalDesc}</span></>}</div>
@@ -854,9 +859,9 @@ export default function App(){
   // ── Sync status dot ──────────────────────────────────────
   const syncDot = {
     idle:    {bg:"#3A3028",label:""},
-    saving:  {bg:"#C8952A",label:"Saving…"},
-    saved:   {bg:"#5A8A60",label:"Saved"},
-    error:   {bg:"#A03028",label:"Save error"},
+    saving:  {bg:"#8C5408",label:"Saving…"},
+    saved:   {bg:"#2A5E2A",label:"Saved"},
+    error:   {bg:"#841A18",label:"Save error"},
     offline: {bg:"#666",   label:"Offline mode"},
   }[sync];
 
@@ -962,9 +967,9 @@ export default function App(){
 
       {/* Not configured banner */}
       {!FB_CONFIGURED&&(
-        <div style={{background:"#1A1004",borderBottom:`1px solid #5A3A10`,padding:"8px 20px",fontSize:"12px",color:"#C8A050",display:"flex",gap:"8px",alignItems:"center"}}>
+        <div style={{background:"#FDF6EC",borderBottom:`1px solid #D4A840`,padding:"8px 20px",fontSize:"12px",color:"#7A5008",display:"flex",gap:"8px",alignItems:"center"}}>
           <span>⚠️</span>
-          <span>Firebase not configured — running in demo mode. Set <code style={{background:"#2A1A04",padding:"1px 4px",borderRadius:"3px",fontFamily:"monospace"}}>FIREBASE_URL</code> at the top of the file to enable persistence.</span>
+          <span>Firebase not configured — running in demo mode. Set <code style={{background:"#F0E4C8",padding:"1px 4px",borderRadius:"3px",fontFamily:"monospace"}}>FIREBASE_URL</code> at the top of the file to enable persistence.</span>
         </div>
       )}
 
