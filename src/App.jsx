@@ -273,40 +273,123 @@ function FieldMap({boundary=[],onBoundaryChange,height=350}){
 }
 
 // ── Seeding Form ──────────────────────────────────────────────────────
+const PULSE_CROPS = ["Peas","Lentils","Chickpeas","Soybeans"];
+
 function SeedingForm({v,set}){
+  // ── Crops (multiple for double-crop) ──
+  const crops   = v.crops   || (v.crop ? [{id:genId(),crop:v.crop,seedRate:v.seedRate||"",totalSeed:v.totalSeed||""}] : [{id:genId(),crop:"",seedRate:"",totalSeed:""}]);
+  const addCrop = ()=>set({...v,crops:[...crops,{id:genId(),crop:"",seedRate:"",totalSeed:""}]});
+  const updCrop = (id,f,val)=>set({...v,crops:crops.map(c=>c.id===id?{...c,[f]:val}:c)});
+  const delCrop = (id)=>set({...v,crops:crops.filter(c=>c.id!==id)});
+
+  // ── Fertilizers (multiple products) ──
+  const ferts   = v.ferts   || (v.fertBlend ? [{id:genId(),blend:v.fertBlend,custom:v.fertCustom||"",rate:v.fertRate||"",total:v.totalFert||"",placement:"Seed-placed"}] : []);
+  const addFert = ()=>set({...v,ferts:[...ferts,{id:genId(),blend:"",custom:"",rate:"",total:"",placement:"Seed-placed"}]});
+  const updFert = (id,f,val)=>set({...v,ferts:ferts.map(x=>x.id===id?{...x,[f]:val}:x)});
+  const delFert = (id)=>set({...v,ferts:ferts.filter(x=>x.id!==id)});
+
+  // ── Inoculants (multiple products) ──
+  const inoculants   = v.inoculants   || (v.inoculantProduct ? [{id:genId(),product:v.inoculantProduct,rate:v.inoculantRate||""}] : []);
+  const addInoculant = ()=>set({...v,inoculants:[...inoculants,{id:genId(),product:"",rate:""}]});
+  const updInoculant = (id,f,val)=>set({...v,inoculants:inoculants.map(x=>x.id===id?{...x,[f]:val}:x)});
+  const delInoculant = (id)=>set({...v,inoculants:inoculants.filter(x=>x.id!==id)});
+
+  const hasPulse = crops.some(c=>PULSE_CROPS.includes(c.crop));
+  const PLACEMENTS = ["Seed-placed","Side-band","Mid-row band","Broadcast","In-furrow"];
+
   return(
     <div>
-      <div style={S.row}><label style={S.label}>Crop Seeded *</label>
-        <select style={S.input} value={v.crop||""} onChange={e=>set({...v,crop:e.target.value})}>
-          <option value="">Select crop…</option>{CROPS.map(c=><option key={c}>{c}</option>)}
-        </select>
-      </div>
-      <div style={S.g2}>
-        <div style={S.row}><label style={S.label}>Seed Rate (lbs / ac)</label><input style={S.input} type="number" step="0.1" placeholder="e.g. 90" value={v.seedRate||""} onChange={e=>set({...v,seedRate:e.target.value})}/></div>
-        <div style={S.row}><label style={S.label}>Total Seed (lbs)</label><input style={S.input} type="number" step="1" placeholder="e.g. 14400" value={v.totalSeed||""} onChange={e=>set({...v,totalSeed:e.target.value})}/></div>
-      </div>
-      <div style={{background:"#FBF6EC",border:`1px solid #E0CFA0`,borderRadius:"8px",padding:"14px",marginBottom:"14px"}}>
-        <p style={{margin:"0 0 12px",fontSize:"11px",color:T.muted,textTransform:"uppercase",letterSpacing:"0.9px",fontWeight:700}}>Seed-Placed Fertilizer</p>
-        <div style={S.g2}>
-          <div style={S.row}><label style={S.label}>Fertilizer Rate (lbs / ac)</label><input style={S.input} type="number" step="0.1" placeholder="e.g. 40" value={v.fertRate||""} onChange={e=>set({...v,fertRate:e.target.value})}/></div>
-          <div style={S.row}><label style={S.label}>Total Fertilizer (lbs)</label><input style={S.input} type="number" step="1" placeholder="e.g. 6400" value={v.totalFert||""} onChange={e=>set({...v,totalFert:e.target.value})}/></div>
+      {/* ── Crops ── */}
+      <div style={{background:"#F8F4EC",border:`1px solid #E0CFA0`,borderRadius:"8px",padding:"14px",marginBottom:"14px"}}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"10px"}}>
+          <p style={{margin:0,fontSize:"11px",color:"#7A6020",textTransform:"uppercase",letterSpacing:"0.9px",fontWeight:700}}>🌱 Crop(s) Seeded</p>
+          <button style={{...mkBtn("ghost"),padding:"4px 10px",fontSize:"12px",borderColor:"#C0A040",color:"#7A6020"}} onClick={addCrop}>+ Add Crop</button>
         </div>
-        <div style={S.row}><label style={S.label}>Fertilizer Blend</label>
-          <select style={S.input} value={v.fertBlend||""} onChange={e=>set({...v,fertBlend:e.target.value})}>
-            <option value="">Select blend…</option>{FERT_BLENDS.map(b=><option key={b}>{b}</option>)}
-          </select>
-        </div>
-        {v.fertBlend==="Custom Blend"&&<div style={S.row}><label style={S.label}>Custom Blend Analysis</label><input style={S.input} type="text" placeholder="e.g. 16-20-10-5S" value={v.fertCustom||""} onChange={e=>set({...v,fertCustom:e.target.value})}/></div>}
-      </div>
-      {v.crop==="Peas"&&(
-        <div style={{background:"#EFF7ED",border:`1px solid #A8CCA4`,borderRadius:"8px",padding:"14px",marginBottom:"14px"}}>
-          <p style={{margin:"0 0 12px",fontSize:"11px",color:"#2A6A28",textTransform:"uppercase",letterSpacing:"0.9px",fontWeight:700}}>🧪 Inoculant (Peas)</p>
-          <div style={S.g2}>
-            <div style={S.row}><label style={S.label}>Inoculant Product</label><input style={S.input} type="text" placeholder="e.g. Nodulator PRO, TagTeam" value={v.inoculantProduct||""} onChange={e=>set({...v,inoculantProduct:e.target.value})}/></div>
-            <div style={S.row}><label style={S.label}>Application Rate</label><input style={S.input} type="text" placeholder="e.g. 4 oz / cwt" value={v.inoculantRate||""} onChange={e=>set({...v,inoculantRate:e.target.value})}/></div>
+        {crops.map((c,i)=>(
+          <div key={c.id} style={{background:"#FFFFFF",border:`1px solid #E0CFA0`,borderRadius:"7px",padding:"11px",marginBottom:"8px"}}>
+            <div style={{display:"flex",gap:"8px",alignItems:"flex-end",flexWrap:"wrap"}}>
+              <div style={{flex:"2 1 150px"}}>
+                <label style={S.label}>{crops.length>1?`Crop #${i+1}`:"Crop"} *</label>
+                <select style={S.input} value={c.crop} onChange={e=>updCrop(c.id,"crop",e.target.value)}>
+                  <option value="">Select crop…</option>{CROPS.map(cr=><option key={cr}>{cr}</option>)}
+                </select>
+              </div>
+              <div style={{flex:"1 1 90px"}}>
+                <label style={S.label}>Rate (lbs/ac)</label>
+                <input style={S.input} type="number" step="0.1" placeholder="e.g. 90" value={c.seedRate} onChange={e=>updCrop(c.id,"seedRate",e.target.value)}/>
+              </div>
+              <div style={{flex:"1 1 90px"}}>
+                <label style={S.label}>Total (lbs)</label>
+                <input style={S.input} type="number" step="1" placeholder="e.g. 14400" value={c.totalSeed} onChange={e=>updCrop(c.id,"totalSeed",e.target.value)}/>
+              </div>
+              {crops.length>1&&<button style={{...mkBtn("ghost"),padding:"7px 9px",color:T.danger,border:"none",background:"transparent",fontSize:"16px"}} onClick={()=>delCrop(c.id)}>✕</button>}
+            </div>
           </div>
+        ))}
+      </div>
+
+      {/* ── Fertilizers ── */}
+      <div style={{background:"#FBF6EC",border:`1px solid #E0CFA0`,borderRadius:"8px",padding:"14px",marginBottom:"14px"}}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"10px"}}>
+          <p style={{margin:0,fontSize:"11px",color:T.muted,textTransform:"uppercase",letterSpacing:"0.9px",fontWeight:700}}>⚗️ Fertilizer Products</p>
+          <button style={{...mkBtn("ghost"),padding:"4px 10px",fontSize:"12px",borderColor:"#C0A040",color:"#7A6020"}} onClick={addFert}>+ Add Fertilizer</button>
         </div>
-      )}
+        {ferts.length===0&&<div style={{textAlign:"center",padding:"14px",color:T.faint,fontSize:"13px",border:`1px dashed ${T.border}`,borderRadius:"6px"}}>Click "+ Add Fertilizer" to log products applied</div>}
+        {ferts.map((f,i)=>(
+          <div key={f.id} style={{background:"#FFFFFF",border:`1px solid #E0CFA0`,borderRadius:"7px",padding:"11px",marginBottom:"8px"}}>
+            <div style={{display:"flex",gap:"8px",alignItems:"flex-end",flexWrap:"wrap"}}>
+              <div style={{flex:"2 1 150px"}}>
+                <label style={S.label}>Product #{i+1}</label>
+                <select style={S.input} value={f.blend} onChange={e=>updFert(f.id,"blend",e.target.value)}>
+                  <option value="">Select blend…</option>{FERT_BLENDS.map(b=><option key={b}>{b}</option>)}
+                </select>
+                {f.blend==="Custom Blend"&&<input style={{...S.input,marginTop:"6px"}} type="text" placeholder="e.g. 16-20-10-5S" value={f.custom} onChange={e=>updFert(f.id,"custom",e.target.value)}/>}
+              </div>
+              <div style={{flex:"1 1 80px"}}>
+                <label style={S.label}>Rate (lbs/ac)</label>
+                <input style={S.input} type="number" step="0.1" placeholder="e.g. 40" value={f.rate} onChange={e=>updFert(f.id,"rate",e.target.value)}/>
+              </div>
+              <div style={{flex:"1 1 80px"}}>
+                <label style={S.label}>Total (lbs)</label>
+                <input style={S.input} type="number" step="1" placeholder="e.g. 6400" value={f.total} onChange={e=>updFert(f.id,"total",e.target.value)}/>
+              </div>
+              <div style={{flex:"1 1 110px"}}>
+                <label style={S.label}>Placement</label>
+                <select style={S.input} value={f.placement} onChange={e=>updFert(f.id,"placement",e.target.value)}>
+                  {PLACEMENTS.map(p=><option key={p}>{p}</option>)}
+                </select>
+              </div>
+              <button style={{...mkBtn("ghost"),padding:"7px 9px",color:T.danger,border:"none",background:"transparent",fontSize:"16px"}} onClick={()=>delFert(f.id)}>✕</button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* ── Inoculants — always available, not just for peas ── */}
+      <div style={{background:"#EFF7ED",border:`1px solid #A8CCA4`,borderRadius:"8px",padding:"14px",marginBottom:"14px"}}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"10px"}}>
+          <p style={{margin:0,fontSize:"11px",color:"#2A6A28",textTransform:"uppercase",letterSpacing:"0.9px",fontWeight:700}}>🧪 Inoculant / Seed Treatment</p>
+          <button style={{...mkBtn("ghost"),padding:"4px 10px",fontSize:"12px",borderColor:"#80B87C",color:"#2A6A28"}} onClick={addInoculant}>+ Add Inoculant</button>
+        </div>
+        {inoculants.length===0&&<div style={{textAlign:"center",padding:"14px",color:T.faint,fontSize:"13px",border:`1px dashed #C0DCC0`,borderRadius:"6px"}}>{hasPulse?"Pulse crop detected — ":""}Click "+ Add Inoculant" to log treatments</div>}
+        {inoculants.map((n,i)=>(
+          <div key={n.id} style={{background:"#FFFFFF",border:`1px solid #A8CCA4`,borderRadius:"7px",padding:"11px",marginBottom:"8px"}}>
+            <div style={{display:"flex",gap:"8px",alignItems:"flex-end",flexWrap:"wrap"}}>
+              <div style={{flex:"2 1 180px"}}>
+                <label style={S.label}>Product #{i+1}</label>
+                <input style={S.input} type="text" placeholder="e.g. Nodulator PRO, TagTeam, Optimize" value={n.product} onChange={e=>updInoculant(n.id,"product",e.target.value)}/>
+              </div>
+              <div style={{flex:"1 1 120px"}}>
+                <label style={S.label}>Rate</label>
+                <input style={S.input} type="text" placeholder="e.g. 4 oz/cwt" value={n.rate} onChange={e=>updInoculant(n.id,"rate",e.target.value)}/>
+              </div>
+              <button style={{...mkBtn("ghost"),padding:"7px 9px",color:T.danger,border:"none",background:"transparent",fontSize:"16px"}} onClick={()=>delInoculant(n.id)}>✕</button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* ── Equipment ── */}
       <div style={S.g2}>
         <div style={S.row}><label style={S.label}>Seeder / Equipment</label><input style={S.input} type="text" placeholder="e.g. JD 1910 Air Cart" value={v.equipment||""} onChange={e=>set({...v,equipment:e.target.value})}/></div>
         <div style={S.row}><label style={S.label}>Seeding Depth (in)</label><input style={S.input} type="number" step="0.25" placeholder="e.g. 1.5" value={v.depth||""} onChange={e=>set({...v,depth:e.target.value})}/></div>
@@ -365,25 +448,63 @@ function ActivityCard({activity,onDelete}){
   const meta=ACTIVITY_META[activity.type]||ACTIVITY_META.other;
   const d=activity.data||{};
   const summary=()=>{
-    if(activity.type==="seeding") return[d.crop&&`Crop: ${d.crop}`,d.seedRate&&`${d.seedRate} lbs/ac`,(d.fertBlend&&d.fertBlend!=="Custom Blend")&&`Fert: ${d.fertBlend}`,(d.fertBlend==="Custom Blend"&&d.fertCustom)&&`Fert: ${d.fertCustom}`,d.inoculantProduct&&`Inoc: ${d.inoculantProduct}`].filter(Boolean).join("  ·  ");
+    if(activity.type==="seeding"){
+      const crops=(d.crops||[]).map(c=>c.crop).filter(Boolean);
+      const ferts=(d.ferts||[]).map(f=>f.blend==="Custom Blend"?f.custom:f.blend).filter(Boolean);
+      const inocs=(d.inoculants||[]).map(n=>n.product).filter(Boolean);
+      // Legacy fallback
+      if(!crops.length&&d.crop) crops.push(d.crop);
+      if(!ferts.length&&d.fertBlend) ferts.push(d.fertBlend==="Custom Blend"?d.fertCustom:d.fertBlend);
+      return[crops.length&&`Crop: ${crops.join(" + ")}`, ferts.length&&`Fert: ${ferts.join(", ")}`, inocs.length&&`Inoc: ${inocs.join(", ")}`].filter(Boolean).join("  ·  ");
+    }
     if(activity.type==="spraying") return(d.tankMix||[]).map(c=>`${c.chemical==="Other"?(c.chemicalName||"?"):c.chemical} ${c.oz}${c.unit}`).join(", ")||"No chemicals";
     return d.details||"";
   };
   const detail=()=>{
-    if(activity.type==="seeding") return(
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"5px 16px",marginTop:"10px",fontSize:"13px"}}>
-        {d.crop&&<span><span style={{color:T.muted}}>Crop:</span> {d.crop}</span>}
-        {d.seedRate&&<span><span style={{color:T.muted}}>Seed rate:</span> {d.seedRate} lbs/ac</span>}
-        {d.totalSeed&&<span><span style={{color:T.muted}}>Total seed:</span> {Number(d.totalSeed).toLocaleString()} lbs</span>}
-        {d.fertBlend&&<span><span style={{color:T.muted}}>Fert blend:</span> {d.fertBlend==="Custom Blend"?d.fertCustom:d.fertBlend}</span>}
-        {d.fertRate&&<span><span style={{color:T.muted}}>Fert rate:</span> {d.fertRate} lbs/ac</span>}
-        {d.totalFert&&<span><span style={{color:T.muted}}>Total fert:</span> {Number(d.totalFert).toLocaleString()} lbs</span>}
-        {d.inoculantProduct&&<span><span style={{color:T.muted}}>Inoculant:</span> {d.inoculantProduct}</span>}
-        {d.inoculantRate&&<span><span style={{color:T.muted}}>Inoc rate:</span> {d.inoculantRate}</span>}
-        {d.equipment&&<span><span style={{color:T.muted}}>Equipment:</span> {d.equipment}</span>}
-        {d.depth&&<span><span style={{color:T.muted}}>Depth:</span> {d.depth}"</span>}
-      </div>
-    );
+    if(activity.type==="seeding"){
+      // Support both new multi-item and legacy single-item format
+      const crops     = d.crops     || (d.crop            ? [{crop:d.crop,seedRate:d.seedRate,totalSeed:d.totalSeed}]   : []);
+      const ferts     = d.ferts     || (d.fertBlend        ? [{blend:d.fertBlend,custom:d.fertCustom,rate:d.fertRate,total:d.totalFert,placement:"Seed-placed"}] : []);
+      const inoculants= d.inoculants|| (d.inoculantProduct ? [{product:d.inoculantProduct,rate:d.inoculantRate}]          : []);
+      return(
+        <div style={{marginTop:"10px",fontSize:"13px"}}>
+          {crops.length>0&&<>
+            <p style={{margin:"0 0 5px",fontSize:"11px",color:T.muted,textTransform:"uppercase",letterSpacing:"0.8px"}}>Crops</p>
+            {crops.map((c,i)=>(
+              <div key={i} style={{display:"flex",gap:"16px",padding:"5px 10px",background:T.panel,borderRadius:"4px",marginBottom:"4px",flexWrap:"wrap"}}>
+                <span style={{fontWeight:600,minWidth:"120px"}}>{c.crop||"—"}</span>
+                {c.seedRate&&<span><span style={{color:T.muted}}>Rate:</span> {c.seedRate} lbs/ac</span>}
+                {c.totalSeed&&<span><span style={{color:T.muted}}>Total:</span> {Number(c.totalSeed).toLocaleString()} lbs</span>}
+              </div>
+            ))}
+          </>}
+          {ferts.length>0&&<>
+            <p style={{margin:"8px 0 5px",fontSize:"11px",color:T.muted,textTransform:"uppercase",letterSpacing:"0.8px"}}>Fertilizers</p>
+            {ferts.map((f,i)=>(
+              <div key={i} style={{display:"flex",gap:"16px",padding:"5px 10px",background:T.panel,borderRadius:"4px",marginBottom:"4px",flexWrap:"wrap"}}>
+                <span style={{fontWeight:600,minWidth:"120px"}}>{f.blend==="Custom Blend"?f.custom:f.blend||"—"}</span>
+                {f.placement&&<span style={{color:T.muted,fontSize:"12px"}}>{f.placement}</span>}
+                {f.rate&&<span><span style={{color:T.muted}}>Rate:</span> {f.rate} lbs/ac</span>}
+                {f.total&&<span><span style={{color:T.muted}}>Total:</span> {Number(f.total).toLocaleString()} lbs</span>}
+              </div>
+            ))}
+          </>}
+          {inoculants.length>0&&<>
+            <p style={{margin:"8px 0 5px",fontSize:"11px",color:"#2A6A28",textTransform:"uppercase",letterSpacing:"0.8px"}}>🧪 Inoculants</p>
+            {inoculants.map((n,i)=>(
+              <div key={i} style={{display:"flex",gap:"16px",padding:"5px 10px",background:"#F0F8EE",border:`1px solid #C0DCC0`,borderRadius:"4px",marginBottom:"4px",flexWrap:"wrap"}}>
+                <span style={{fontWeight:600}}>{n.product||"—"}</span>
+                {n.rate&&<span style={{color:T.muted}}>{n.rate}</span>}
+              </div>
+            ))}
+          </>}
+          {(d.equipment||d.depth)&&<div style={{marginTop:"6px",display:"flex",gap:"16px",flexWrap:"wrap"}}>
+            {d.equipment&&<span><span style={{color:T.muted}}>Equipment:</span> {d.equipment}</span>}
+            {d.depth&&<span><span style={{color:T.muted}}>Depth:</span> {d.depth}"</span>}
+          </div>}
+        </div>
+      );
+    }
     if(activity.type==="spraying") return(
       <div style={{marginTop:"10px",fontSize:"13px"}}>
         {d.waterVol&&<div style={{marginBottom:"5px"}}><span style={{color:T.muted}}>Water vol:</span> {d.waterVol} gal/ac</div>}
@@ -855,19 +976,47 @@ function ReportsView({fields,activities,onBack}){
         )}
       </div>
     );
-    if(a.type==="seeding") return(
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))",gap:"6px 16px",fontSize:"13px"}}>
-        {d.crop&&<span><span style={{color:T.muted}}>Crop:</span> {d.crop}</span>}
-        {d.seedRate&&<span><span style={{color:T.muted}}>Seed rate:</span> {d.seedRate} lbs/ac</span>}
-        {d.totalSeed&&<span><span style={{color:T.muted}}>Total seed:</span> {Number(d.totalSeed).toLocaleString()} lbs</span>}
-        {d.fertBlend&&<span><span style={{color:T.muted}}>Fert blend:</span> {d.fertBlend==="Custom Blend"?d.fertCustom:d.fertBlend}</span>}
-        {d.fertRate&&<span><span style={{color:T.muted}}>Fert rate:</span> {d.fertRate} lbs/ac</span>}
-        {d.totalFert&&<span><span style={{color:T.muted}}>Total fert:</span> {Number(d.totalFert).toLocaleString()} lbs</span>}
-        {d.inoculantProduct&&<span><span style={{color:T.muted}}>Inoculant:</span> {d.inoculantProduct} @ {d.inoculantRate}</span>}
-        {d.equipment&&<span><span style={{color:T.muted}}>Equipment:</span> {d.equipment}</span>}
-        {d.depth&&<span><span style={{color:T.muted}}>Depth:</span> {d.depth}"</span>}
-      </div>
-    );
+    if(a.type==="seeding"){
+      const crops     = d.crops     || (d.crop            ? [{crop:d.crop,seedRate:d.seedRate,totalSeed:d.totalSeed}]   : []);
+      const ferts     = d.ferts     || (d.fertBlend        ? [{blend:d.fertBlend,custom:d.fertCustom,rate:d.fertRate,total:d.totalFert,placement:"Seed-placed"}] : []);
+      const inoculants= d.inoculants|| (d.inoculantProduct ? [{product:d.inoculantProduct,rate:d.inoculantRate}]          : []);
+      return(
+        <div style={{fontSize:"13px"}}>
+          {crops.length>0&&(
+            <table style={{width:"100%",borderCollapse:"collapse",marginBottom:"8px"}}>
+              <thead><tr style={{background:T.panel}}>
+                <th style={{textAlign:"left",padding:"4px 8px",color:T.muted,fontWeight:600,fontSize:"11px",textTransform:"uppercase"}}>Crop</th>
+                <th style={{textAlign:"right",padding:"4px 8px",color:T.muted,fontWeight:600,fontSize:"11px",textTransform:"uppercase"}}>Rate (lbs/ac)</th>
+                <th style={{textAlign:"right",padding:"4px 8px",color:T.muted,fontWeight:600,fontSize:"11px",textTransform:"uppercase"}}>Total (lbs)</th>
+              </tr></thead>
+              <tbody>{crops.map((c,i)=><tr key={i} style={{borderBottom:`1px solid ${T.border}`}}>
+                <td style={{padding:"4px 8px",fontWeight:600}}>{c.crop||"—"}</td>
+                <td style={{padding:"4px 8px",textAlign:"right"}}>{c.seedRate||"—"}</td>
+                <td style={{padding:"4px 8px",textAlign:"right"}}>{c.totalSeed?Number(c.totalSeed).toLocaleString():"—"}</td>
+              </tr>)}</tbody>
+            </table>
+          )}
+          {ferts.length>0&&(
+            <table style={{width:"100%",borderCollapse:"collapse",marginBottom:"8px"}}>
+              <thead><tr style={{background:T.panel}}>
+                <th style={{textAlign:"left",padding:"4px 8px",color:T.muted,fontWeight:600,fontSize:"11px",textTransform:"uppercase"}}>Fertilizer</th>
+                <th style={{textAlign:"left",padding:"4px 8px",color:T.muted,fontWeight:600,fontSize:"11px",textTransform:"uppercase"}}>Placement</th>
+                <th style={{textAlign:"right",padding:"4px 8px",color:T.muted,fontWeight:600,fontSize:"11px",textTransform:"uppercase"}}>Rate (lbs/ac)</th>
+                <th style={{textAlign:"right",padding:"4px 8px",color:T.muted,fontWeight:600,fontSize:"11px",textTransform:"uppercase"}}>Total (lbs)</th>
+              </tr></thead>
+              <tbody>{ferts.map((f,i)=><tr key={i} style={{borderBottom:`1px solid ${T.border}`}}>
+                <td style={{padding:"4px 8px",fontWeight:600}}>{f.blend==="Custom Blend"?f.custom:f.blend||"—"}</td>
+                <td style={{padding:"4px 8px",color:T.muted}}>{f.placement||"—"}</td>
+                <td style={{padding:"4px 8px",textAlign:"right"}}>{f.rate||"—"}</td>
+                <td style={{padding:"4px 8px",textAlign:"right"}}>{f.total?Number(f.total).toLocaleString():"—"}</td>
+              </tr>)}</tbody>
+            </table>
+          )}
+          {inoculants.length>0&&<div style={{marginBottom:"6px"}}><span style={{color:"#2A6A28",fontWeight:600}}>🧪 Inoculants: </span>{inoculants.map(n=>`${n.product}${n.rate?` @ ${n.rate}`:""}`).join("  ·  ")}</div>}
+          {(d.equipment||d.depth)&&<div style={{color:T.muted}}>{d.equipment&&`Equipment: ${d.equipment}`}{d.equipment&&d.depth&&"  ·  "}{d.depth&&`Depth: ${d.depth}"`}</div>}
+        </div>
+      );
+    }
     return d.details?<p style={{margin:0,fontSize:"13px"}}>{d.details}</p>:null;
   };
 
