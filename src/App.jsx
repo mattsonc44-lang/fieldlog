@@ -42,10 +42,11 @@ const FERT_BLENDS  = ["28-0-0 (UAN)","46-0-0 (Urea)","11-52-0 (MAP)","18-46-0 (D
 const CHEMICALS    = ["Glyphosate (Roundup)","2,4-D Amine","MCPA Amine","Lontrel 360","Infinity","Odyssey","Axial","Puma Super","Buctril M","Muster 75DF","Centurion","Tundra","Refine M","Bumper 418 EC","Stratego YLD","Headline","Priaxor","Trivapro","Dimethoate","Matador","Other"];
 const ACTIVITY_META = {
   seeding:     {label:"Seeding",      icon:"🌱",color:"#C07010"},
-  spraying:    {label:"Spraying",     icon:"💧",color:"#4A90C8"},
+  spraying:    {label:"Spraying",     icon:"💧",color:"#1E5078"},
+  scouting:    {label:"Scouting",     icon:"🔍",color:"#2A7A3A"},
   rockPicking: {label:"Rock Picking", icon:"🪨",color:"#9A7060"},
   tillage:     {label:"Tillage",      icon:"⚙️", color:"#6B8F71"},
-  harvest:     {label:"Harvest",      icon:"🌾",color:"#D4B040"},
+  harvest:     {label:"Harvest",      icon:"🌾",color:"#C09010"},
   other:       {label:"Other",        icon:"📋",color:"#888888"},
 };
 const DEMO_FIELDS = [
@@ -398,6 +399,232 @@ function SeedingForm({v,set}){
   );
 }
 
+// ── Scouting Form ─────────────────────────────────────────────────────
+const WEED_SPECIES = ["Wild Oats","Cleavers","Kochia","Foxtail","Thistle","Buckwheat","Mustard","Lamb's Quarters","Stinkweed","Dandelion","Other"];
+const DISEASE_LIST = ["Sclerotinia","Fusarium","Root Rot","Leaf Spot","Stripe Rust","Stem Rust","Powdery Mildew","Clubroot","Ergot","Blackleg","Other"];
+const INSECT_LIST  = ["Bertha Armyworm","Diamondback Moth","Flea Beetle","Aphids","Grasshoppers","Cutworm","Wheat Midge","Wireworm","Lygus Bug","Other"];
+const RATING_5     = ["1 — None / Excellent","2 — Trace / Good","3 — Moderate / Fair","4 — High / Poor","5 — Severe / Very Poor"];
+const RATING_3     = ["Low","Medium","High"];
+const GROWTH_STAGES= ["Germination","Seedling (1-2 leaf)","3-4 Leaf","Tillering","Stem Elongation","Boot","Heading / Flowering","Milk","Dough","Ripening","Harvest Ready"];
+
+function ScoutingForm({v,set}){
+  const weeds    = v.weeds    || [];
+  const diseases = v.diseases || [];
+  const insects  = v.insects  || [];
+
+  const addWeed    = ()=>set({...v,weeds:   [...weeds,   {id:genId(),species:"",pressure:"3 — Moderate / Fair",location:""}]});
+  const updWeed    = (id,f,val)=>set({...v,weeds:   weeds.map(x=>x.id===id?{...x,[f]:val}:x)});
+  const delWeed    = (id)=>set({...v,weeds:   weeds.filter(x=>x.id!==id)});
+
+  const addDisease = ()=>set({...v,diseases:[...diseases,{id:genId(),disease:"",severity:"Low",affectedArea:""}]});
+  const updDisease = (id,f,val)=>set({...v,diseases:diseases.map(x=>x.id===id?{...x,[f]:val}:x)});
+  const delDisease = (id)=>set({...v,diseases:diseases.filter(x=>x.id!==id)});
+
+  const addInsect  = ()=>set({...v,insects: [...insects, {id:genId(),insect:"",pressure:"Low",count:""}]});
+  const updInsect  = (id,f,val)=>set({...v,insects: insects.map(x=>x.id===id?{...x,[f]:val}:x)});
+  const delInsect  = (id)=>set({...v,insects: insects.filter(x=>x.id!==id)});
+
+  const secStyle = (bg,border,headColor)=>({background:bg,border:`1px solid ${border}`,borderRadius:"8px",padding:"14px",marginBottom:"14px"});
+  const rowStyle = (bg,border)=>({background:bg,border:`1px solid ${border}`,borderRadius:"7px",padding:"11px",marginBottom:"8px"});
+  const addBtn   = (col)=>({...mkBtn("ghost"),padding:"4px 10px",fontSize:"12px",borderColor:col,color:col});
+  const emptyBox = {textAlign:"center",padding:"12px",color:T.faint,fontSize:"13px",border:`1px dashed ${T.border}`,borderRadius:"6px"};
+
+  return(
+    <div>
+
+      {/* ── Crop Status ── */}
+      <div style={secStyle("#F8F4EC","#E0CFA0")}>
+        <p style={{margin:"0 0 12px",fontSize:"11px",color:"#7A6020",textTransform:"uppercase",letterSpacing:"0.9px",fontWeight:700}}>🌿 Crop Status</p>
+        <div style={S.g2}>
+          <div style={S.row}>
+            <label style={S.label}>Growth Stage</label>
+            <select style={S.input} value={v.growthStage||""} onChange={e=>set({...v,growthStage:e.target.value})}>
+              <option value="">Select stage…</option>
+              {GROWTH_STAGES.map(s=><option key={s}>{s}</option>)}
+            </select>
+          </div>
+          <div style={S.row}>
+            <label style={S.label}>Crop Health Rating</label>
+            <select style={S.input} value={v.cropHealth||""} onChange={e=>set({...v,cropHealth:e.target.value})}>
+              <option value="">Select rating…</option>
+              {RATING_5.map(r=><option key={r}>{r}</option>)}
+            </select>
+          </div>
+        </div>
+        <div style={S.g2}>
+          <div style={S.row}>
+            <label style={S.label}>Stand Density</label>
+            <select style={S.input} value={v.standDensity||""} onChange={e=>set({...v,standDensity:e.target.value})}>
+              <option value="">Select…</option>
+              {["Excellent (uniform, thick)","Good (minor gaps)","Fair (patchy)","Poor (thin / failed areas)"].map(o=><option key={o}>{o}</option>)}
+            </select>
+          </div>
+          <div style={S.row}>
+            <label style={S.label}>Estimated Yield Potential</label>
+            <input style={S.input} type="text" placeholder="e.g. 45 bu/ac, above avg" value={v.yieldPotential||""} onChange={e=>set({...v,yieldPotential:e.target.value})}/>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Weed Pressure ── */}
+      <div style={secStyle("#FDF8F0","#E8C880")}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"10px"}}>
+          <p style={{margin:0,fontSize:"11px",color:"#8A6010",textTransform:"uppercase",letterSpacing:"0.9px",fontWeight:700}}>🌿 Weed Pressure</p>
+          <button style={addBtn("#C09030")} onClick={addWeed}>+ Add Weed</button>
+        </div>
+        <div style={S.g2}>
+          <div style={S.row}>
+            <label style={S.label}>Overall Weed Pressure</label>
+            <select style={S.input} value={v.weedPressure||""} onChange={e=>set({...v,weedPressure:e.target.value})}>
+              <option value="">Select…</option>{RATING_3.map(r=><option key={r}>{r}</option>)}
+            </select>
+          </div>
+          <div style={S.row}>
+            <label style={S.label}>Economic Threshold Reached?</label>
+            <select style={S.input} value={v.weedThreshold||""} onChange={e=>set({...v,weedThreshold:e.target.value})}>
+              <option value="">Select…</option>
+              {["No — monitor only","Approaching threshold","Yes — action required"].map(o=><option key={o}>{o}</option>)}
+            </select>
+          </div>
+        </div>
+        {weeds.length===0&&<div style={emptyBox}>Click "+ Add Weed" to log specific species</div>}
+        {weeds.map((w,i)=>(
+          <div key={w.id} style={rowStyle("#FFFFFF","#E8C880")}>
+            <div style={{display:"flex",gap:"8px",alignItems:"flex-end",flexWrap:"wrap"}}>
+              <div style={{flex:"2 1 140px"}}>
+                <label style={S.label}>Species #{i+1}</label>
+                <select style={S.input} value={w.species} onChange={e=>updWeed(w.id,"species",e.target.value)}>
+                  <option value="">Select species…</option>{WEED_SPECIES.map(s=><option key={s}>{s}</option>)}
+                </select>
+                {w.species==="Other"&&<input style={{...S.input,marginTop:"5px"}} type="text" placeholder="Species name" value={w.speciesName||""} onChange={e=>updWeed(w.id,"speciesName",e.target.value)}/>}
+              </div>
+              <div style={{flex:"1 1 100px"}}>
+                <label style={S.label}>Pressure</label>
+                <select style={S.input} value={w.pressure} onChange={e=>updWeed(w.id,"pressure",e.target.value)}>
+                  {RATING_3.map(r=><option key={r}>{r}</option>)}
+                </select>
+              </div>
+              <div style={{flex:"1 1 120px"}}>
+                <label style={S.label}>Location in Field</label>
+                <input style={S.input} type="text" placeholder="e.g. NW corner" value={w.location} onChange={e=>updWeed(w.id,"location",e.target.value)}/>
+              </div>
+              <button style={{...mkBtn("ghost"),padding:"7px 9px",color:T.danger,border:"none",background:"transparent",fontSize:"16px"}} onClick={()=>delWeed(w.id)}>✕</button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* ── Disease Pressure ── */}
+      <div style={secStyle("#FDF0F0","#E8B0A0")}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"10px"}}>
+          <p style={{margin:0,fontSize:"11px",color:"#8A2010",textTransform:"uppercase",letterSpacing:"0.9px",fontWeight:700}}>🦠 Disease Pressure</p>
+          <button style={addBtn("#C04030")} onClick={addDisease}>+ Add Disease</button>
+        </div>
+        {diseases.length===0&&<div style={emptyBox}>Click "+ Add Disease" to log observations</div>}
+        {diseases.map((d,i)=>(
+          <div key={d.id} style={rowStyle("#FFFFFF","#E8B0A0")}>
+            <div style={{display:"flex",gap:"8px",alignItems:"flex-end",flexWrap:"wrap"}}>
+              <div style={{flex:"2 1 140px"}}>
+                <label style={S.label}>Disease #{i+1}</label>
+                <select style={S.input} value={d.disease} onChange={e=>updDisease(d.id,"disease",e.target.value)}>
+                  <option value="">Select disease…</option>{DISEASE_LIST.map(x=><option key={x}>{x}</option>)}
+                </select>
+                {d.disease==="Other"&&<input style={{...S.input,marginTop:"5px"}} type="text" placeholder="Disease name" value={d.diseaseName||""} onChange={e=>updDisease(d.id,"diseaseName",e.target.value)}/>}
+              </div>
+              <div style={{flex:"1 1 90px"}}>
+                <label style={S.label}>Severity</label>
+                <select style={S.input} value={d.severity} onChange={e=>updDisease(d.id,"severity",e.target.value)}>
+                  {RATING_3.map(r=><option key={r}>{r}</option>)}
+                </select>
+              </div>
+              <div style={{flex:"1 1 110px"}}>
+                <label style={S.label}>% Field Affected</label>
+                <input style={S.input} type="text" placeholder="e.g. 10%, patchy" value={d.affectedArea} onChange={e=>updDisease(d.id,"affectedArea",e.target.value)}/>
+              </div>
+              <button style={{...mkBtn("ghost"),padding:"7px 9px",color:T.danger,border:"none",background:"transparent",fontSize:"16px"}} onClick={()=>delDisease(d.id)}>✕</button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* ── Insect Pressure ── */}
+      <div style={secStyle("#F5F0FC","#C8A8E0")}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"10px"}}>
+          <p style={{margin:0,fontSize:"11px",color:"#5A2080",textTransform:"uppercase",letterSpacing:"0.9px",fontWeight:700}}>🐛 Insect Pressure</p>
+          <button style={addBtn("#7A40A0")} onClick={addInsect}>+ Add Insect</button>
+        </div>
+        {insects.length===0&&<div style={emptyBox}>Click "+ Add Insect" to log observations</div>}
+        {insects.map((n,i)=>(
+          <div key={n.id} style={rowStyle("#FFFFFF","#C8A8E0")}>
+            <div style={{display:"flex",gap:"8px",alignItems:"flex-end",flexWrap:"wrap"}}>
+              <div style={{flex:"2 1 140px"}}>
+                <label style={S.label}>Insect #{i+1}</label>
+                <select style={S.input} value={n.insect} onChange={e=>updInsect(n.id,"insect",e.target.value)}>
+                  <option value="">Select insect…</option>{INSECT_LIST.map(x=><option key={x}>{x}</option>)}
+                </select>
+                {n.insect==="Other"&&<input style={{...S.input,marginTop:"5px"}} type="text" placeholder="Insect name" value={n.insectName||""} onChange={e=>updInsect(n.id,"insectName",e.target.value)}/>}
+              </div>
+              <div style={{flex:"1 1 90px"}}>
+                <label style={S.label}>Pressure</label>
+                <select style={S.input} value={n.pressure} onChange={e=>updInsect(n.id,"pressure",e.target.value)}>
+                  {RATING_3.map(r=><option key={r}>{r}</option>)}
+                </select>
+              </div>
+              <div style={{flex:"1 1 110px"}}>
+                <label style={S.label}>Count / Density</label>
+                <input style={S.input} type="text" placeholder="e.g. 3/ft², 12/plant" value={n.count} onChange={e=>updInsect(n.id,"count",e.target.value)}/>
+              </div>
+              <button style={{...mkBtn("ghost"),padding:"7px 9px",color:T.danger,border:"none",background:"transparent",fontSize:"16px"}} onClick={()=>delInsect(n.id)}>✕</button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* ── Soil & Organic Matter ── */}
+      <div style={secStyle("#F0F5F0","#A0C8A0")}>
+        <p style={{margin:"0 0 12px",fontSize:"11px",color:"#2A5020",textTransform:"uppercase",letterSpacing:"0.9px",fontWeight:700}}>🌍 Soil Observations</p>
+        <div style={S.g2}>
+          <div style={S.row}>
+            <label style={S.label}>Organic Matter</label>
+            <input style={S.input} type="text" placeholder="e.g. 4.2%, High" value={v.organicMatter||""} onChange={e=>set({...v,organicMatter:e.target.value})}/>
+          </div>
+          <div style={S.row}>
+            <label style={S.label}>Soil Moisture</label>
+            <select style={S.input} value={v.soilMoisture||""} onChange={e=>set({...v,soilMoisture:e.target.value})}>
+              <option value="">Select…</option>
+              {["Dry / Drought stress","Below average","Average","Above average","Saturated / Wet"].map(o=><option key={o}>{o}</option>)}
+            </select>
+          </div>
+          <div style={S.row}>
+            <label style={S.label}>Soil Compaction</label>
+            <select style={S.input} value={v.soilCompaction||""} onChange={e=>set({...v,soilCompaction:e.target.value})}>
+              <option value="">Select…</option>{RATING_3.map(r=><option key={r}>{r}</option>)}
+            </select>
+          </div>
+          <div style={S.row}>
+            <label style={S.label}>Soil pH (if known)</label>
+            <input style={S.input} type="text" placeholder="e.g. 7.2" value={v.soilPH||""} onChange={e=>set({...v,soilPH:e.target.value})}/>
+          </div>
+        </div>
+        <div style={S.row}>
+          <label style={S.label}>Soil Observations</label>
+          <textarea style={{...S.input,height:"56px",resize:"vertical"}} placeholder="Salinity patches, erosion, crusting, tile issues…" value={v.soilNotes||""} onChange={e=>set({...v,soilNotes:e.target.value})}/>
+        </div>
+      </div>
+
+      {/* ── Recommended Action ── */}
+      <div style={S.row}>
+        <label style={S.label}>Recommended Action</label>
+        <select style={S.input} value={v.recommendedAction||""} onChange={e=>set({...v,recommendedAction:e.target.value})}>
+          <option value="">Select…</option>
+          {["No action required — monitor","Scout again in 5-7 days","Apply herbicide","Apply fungicide","Apply insecticide","Apply fertilizer","Soil test recommended","Other — see notes"].map(o=><option key={o}>{o}</option>)}
+        </select>
+      </div>
+
+    </div>
+  );
+}
+
 // ── Spraying Form ─────────────────────────────────────────────────────
 function SprayingForm({v,set}){
   const mix=v.tankMix||[];
@@ -458,6 +685,14 @@ function ActivityCard({activity,onDelete}){
       return[crops.length&&`Crop: ${crops.join(" + ")}`, ferts.length&&`Fert: ${ferts.join(", ")}`, inocs.length&&`Inoc: ${inocs.join(", ")}`].filter(Boolean).join("  ·  ");
     }
     if(activity.type==="spraying") return(d.tankMix||[]).map(c=>`${c.chemical==="Other"?(c.chemicalName||"?"):c.chemical} ${c.oz}${c.unit}`).join(", ")||"No chemicals";
+    if(activity.type==="scouting"){
+      const parts=[];
+      if(d.growthStage) parts.push(d.growthStage);
+      if(d.cropHealth)  parts.push(`Health: ${d.cropHealth.split(" — ")[0]}`);
+      if(d.weedPressure)parts.push(`Weeds: ${d.weedPressure}`);
+      if(d.recommendedAction&&d.recommendedAction!=="No action required — monitor") parts.push(d.recommendedAction.split("—")[0].trim());
+      return parts.join("  ·  ")||"Scouting observation";
+    }
     return d.details||"";
   };
   const detail=()=>{
@@ -516,6 +751,64 @@ function ActivityCard({activity,onDelete}){
     );
     return d.details?<p style={{marginTop:"8px",fontSize:"13px"}}>{d.details}</p>:null;
   };
+  const scoutDetail=()=>{
+    if(activity.type!=="scouting") return null;
+    const d=activity.data||{};
+    const badge=(label,val,col)=>val?<span style={{display:"inline-flex",alignItems:"center",gap:"4px",padding:"3px 8px",borderRadius:"12px",fontSize:"12px",background:col+"18",border:`1px solid ${col}40`,color:col,fontWeight:600}}><span style={{color:T.muted,fontWeight:400}}>{label}:</span> {val}</span>:null;
+    return(
+      <div style={{marginTop:"10px",fontSize:"13px"}}>
+        {/* Crop status row */}
+        <div style={{display:"flex",gap:"6px",flexWrap:"wrap",marginBottom:"8px"}}>
+          {badge("Stage",    d.growthStage,           "#2A7A3A")}
+          {badge("Health",   d.cropHealth?.split(" — ")[0],  "#2A7A3A")}
+          {badge("Stand",    d.standDensity?.split(" (")[0],  "#2A7A3A")}
+          {badge("Yield Est",d.yieldPotential,         "#2A7A3A")}
+        </div>
+        {/* Weeds */}
+        {(d.weedPressure||(d.weeds||[]).length>0)&&(
+          <div style={{background:"#FDF8F0",border:`1px solid #E8D080`,borderRadius:"6px",padding:"8px 10px",marginBottom:"6px"}}>
+            <span style={{fontSize:"11px",fontWeight:700,color:"#8A6010",textTransform:"uppercase",letterSpacing:"0.7px"}}>🌿 Weeds</span>
+            {d.weedPressure&&<span style={{marginLeft:"8px",fontSize:"12px",color:T.muted}}>Overall: <strong style={{color:"#8A6010"}}>{d.weedPressure}</strong></span>}
+            {d.weedThreshold&&<span style={{marginLeft:"8px",fontSize:"12px",color:T.muted}}> · {d.weedThreshold}</span>}
+            {(d.weeds||[]).length>0&&<div style={{marginTop:"5px",display:"flex",gap:"5px",flexWrap:"wrap"}}>{d.weeds.map((w,i)=><span key={i} style={{fontSize:"11px",padding:"2px 7px",borderRadius:"10px",background:"#F8ECC0",border:"1px solid #D0A830"}}>{w.species==="Other"?(w.speciesName||"?"):w.species} — {w.pressure}{w.location&&` (${w.location})`}</span>)}</div>}
+          </div>
+        )}
+        {/* Disease */}
+        {(d.diseases||[]).length>0&&(
+          <div style={{background:"#FDF0F0",border:`1px solid #E8B0A0`,borderRadius:"6px",padding:"8px 10px",marginBottom:"6px"}}>
+            <span style={{fontSize:"11px",fontWeight:700,color:"#8A2010",textTransform:"uppercase",letterSpacing:"0.7px"}}>🦠 Disease</span>
+            <div style={{marginTop:"5px",display:"flex",gap:"5px",flexWrap:"wrap"}}>{d.diseases.map((x,i)=><span key={i} style={{fontSize:"11px",padding:"2px 7px",borderRadius:"10px",background:"#FCDDD8",border:"1px solid #E09080"}}>{x.disease==="Other"?(x.diseaseName||"?"):x.disease} — {x.severity}{x.affectedArea&&` (${x.affectedArea})`}</span>)}</div>
+          </div>
+        )}
+        {/* Insects */}
+        {(d.insects||[]).length>0&&(
+          <div style={{background:"#F5F0FC",border:`1px solid #C8A8E0`,borderRadius:"6px",padding:"8px 10px",marginBottom:"6px"}}>
+            <span style={{fontSize:"11px",fontWeight:700,color:"#5A2080",textTransform:"uppercase",letterSpacing:"0.7px"}}>🐛 Insects</span>
+            <div style={{marginTop:"5px",display:"flex",gap:"5px",flexWrap:"wrap"}}>{d.insects.map((x,i)=><span key={i} style={{fontSize:"11px",padding:"2px 7px",borderRadius:"10px",background:"#EAD8F8",border:"1px solid #B090D0"}}>{x.insect==="Other"?(x.insectName||"?"):x.insect} — {x.pressure}{x.count&&` (${x.count})`}</span>)}</div>
+          </div>
+        )}
+        {/* Soil */}
+        {(d.organicMatter||d.soilMoisture||d.soilCompaction||d.soilPH||d.soilNotes)&&(
+          <div style={{background:"#F0F5F0",border:`1px solid #A0C8A0`,borderRadius:"6px",padding:"8px 10px",marginBottom:"6px"}}>
+            <span style={{fontSize:"11px",fontWeight:700,color:"#2A5020",textTransform:"uppercase",letterSpacing:"0.7px"}}>🌍 Soil</span>
+            <div style={{marginTop:"4px",display:"flex",gap:"12px",flexWrap:"wrap",fontSize:"12px"}}>
+              {d.organicMatter&&<span><span style={{color:T.muted}}>OM:</span> {d.organicMatter}</span>}
+              {d.soilMoisture&&<span><span style={{color:T.muted}}>Moisture:</span> {d.soilMoisture.split(" /")[0]}</span>}
+              {d.soilCompaction&&<span><span style={{color:T.muted}}>Compaction:</span> {d.soilCompaction}</span>}
+              {d.soilPH&&<span><span style={{color:T.muted}}>pH:</span> {d.soilPH}</span>}
+              {d.soilNotes&&<span style={{color:T.muted,fontStyle:"italic"}}>{d.soilNotes}</span>}
+            </div>
+          </div>
+        )}
+        {/* Recommended action */}
+        {d.recommendedAction&&(
+          <div style={{marginTop:"4px",padding:"6px 10px",borderRadius:"6px",background:d.recommendedAction.includes("action required")||d.recommendedAction.includes("Apply")?"#FDF0F0":"#F0F5F0",border:`1px solid ${d.recommendedAction.includes("action required")||d.recommendedAction.includes("Apply")?"#E0A090":"#A0C8A0"}`}}>
+            <span style={{fontSize:"12px",fontWeight:600,color:d.recommendedAction.includes("action required")||d.recommendedAction.includes("Apply")?"#8A2010":"#2A5020"}}>→ {d.recommendedAction}</span>
+          </div>
+        )}
+      </div>
+    );
+  };
   return(
     <div style={{...S.card,borderLeft:`3px solid ${meta.color}`,padding:"11px 14px",cursor:"pointer"}} onClick={()=>setOpen(o=>!o)}>
       <div style={{display:"flex",alignItems:"center",gap:"10px"}}>
@@ -533,7 +826,7 @@ function ActivityCard({activity,onDelete}){
           <button style={{...mkBtn("ghost"),padding:"3px 7px",fontSize:"11px",color:T.danger,borderColor:"#4A1010"}} onClick={e=>{e.stopPropagation();onDelete(activity.id)}}>✕</button>
         </div>
       </div>
-      {open&&<div style={{borderTop:`1px solid ${T.border}`,marginTop:"10px",paddingTop:"4px"}}>{detail()}{activity.notes&&<p style={{margin:"10px 0 0",fontSize:"12px",color:T.muted,fontStyle:"italic"}}>📝 {activity.notes}</p>}</div>}
+      {open&&<div style={{borderTop:`1px solid ${T.border}`,marginTop:"10px",paddingTop:"4px"}}>{activity.type==="scouting"?scoutDetail():detail()}{activity.notes&&<p style={{margin:"10px 0 0",fontSize:"12px",color:T.muted,fontStyle:"italic"}}>📝 {activity.notes}</p>}</div>}
     </div>
   );
 }
@@ -561,8 +854,9 @@ function AddActivityModal({field,onClose,onSave}){
             ))}
           </div>
         </div>
-        {type==="seeding"&&<SeedingForm v={data} set={setData}/>}
-        {type==="spraying"&&<SprayingForm v={data} set={setData}/>}
+        {type==="seeding"  &&<SeedingForm v={data} set={setData}/>}
+        {type==="spraying" &&<SprayingForm v={data} set={setData}/>}
+        {type==="scouting" &&<ScoutingForm v={data} set={setData}/>}
         {["rockPicking","tillage","harvest","other"].includes(type)&&<div style={S.row}><label style={S.label}>Details / Equipment</label><input style={S.input} type="text" placeholder="Describe equipment, area, conditions…" value={data.details||""} onChange={e=>setData({...data,details:e.target.value})}/></div>}
         {type&&<div style={S.row}><label style={S.label}>Notes</label><textarea style={{...S.input,height:"60px",resize:"vertical"}} placeholder="Weather, observations…" value={notes} onChange={e=>setNotes(e.target.value)}/></div>}
         {err&&<p style={{color:"#E05050",fontSize:"13px",margin:"0 0 10px"}}>{err}</p>}
@@ -1019,6 +1313,21 @@ function ReportsView({fields,activities,onBack}){
     }
     return d.details?<p style={{margin:0,fontSize:"13px"}}>{d.details}</p>:null;
   };
+  const renderScoutDetail=(d)=>(
+    <div style={{fontSize:"13px"}}>
+      <div style={{display:"flex",gap:"12px",flexWrap:"wrap",marginBottom:"8px"}}>
+        {d.growthStage&&<span><span style={{color:T.muted}}>Stage:</span> {d.growthStage}</span>}
+        {d.cropHealth&&<span><span style={{color:T.muted}}>Health:</span> {d.cropHealth}</span>}
+        {d.standDensity&&<span><span style={{color:T.muted}}>Stand:</span> {d.standDensity}</span>}
+        {d.yieldPotential&&<span><span style={{color:T.muted}}>Yield Est:</span> {d.yieldPotential}</span>}
+      </div>
+      {(d.weedPressure||(d.weeds||[]).length>0)&&<div style={{marginBottom:"6px"}}><strong style={{color:"#8A6010"}}>🌿 Weeds:</strong> {d.weedPressure||""}{d.weedThreshold&&` — ${d.weedThreshold}`}{(d.weeds||[]).length>0&&" · "+d.weeds.map(w=>`${w.species==="Other"?(w.speciesName||"?"):w.species} (${w.pressure})`).join(", ")}</div>}
+      {(d.diseases||[]).length>0&&<div style={{marginBottom:"6px"}}><strong style={{color:"#8A2010"}}>🦠 Disease: </strong>{d.diseases.map(x=>`${x.disease==="Other"?(x.diseaseName||"?"):x.disease} — ${x.severity}${x.affectedArea?` (${x.affectedArea})`:""}`).join(", ")}</div>}
+      {(d.insects||[]).length>0&&<div style={{marginBottom:"6px"}}><strong style={{color:"#5A2080"}}>🐛 Insects: </strong>{d.insects.map(x=>`${x.insect==="Other"?(x.insectName||"?"):x.insect} — ${x.pressure}${x.count?` (${x.count})`:""}`).join(", ")}</div>}
+      {(d.organicMatter||d.soilMoisture||d.soilPH)&&<div style={{marginBottom:"6px"}}><strong style={{color:"#2A5020"}}>🌍 Soil: </strong>{[d.organicMatter&&`OM: ${d.organicMatter}`,d.soilMoisture&&`Moisture: ${d.soilMoisture}`,d.soilPH&&`pH: ${d.soilPH}`,d.soilNotes].filter(Boolean).join("  ·  ")}</div>}
+      {d.recommendedAction&&<div style={{fontWeight:600,color:d.recommendedAction.includes("Apply")||d.recommendedAction.includes("action required")?"#8A2010":"#2A5020"}}>→ {d.recommendedAction}</div>}
+    </div>
+  );
 
   return(
     <div>
@@ -1109,7 +1418,7 @@ function ReportsView({fields,activities,onBack}){
                     <div style={{display:"flex",alignItems:"center",gap:"8px",marginBottom:"8px"}}>
                       <span style={{fontWeight:700,fontSize:"13px",color:meta.color}}>{fmtDate(a.date)}</span>
                     </div>
-                    {renderDetail(a)}
+                    {a.type==="scouting"?renderScoutDetail(a.data||{}):renderDetail(a)}
                     {a.notes&&<p style={{margin:"8px 0 0",fontSize:"12px",color:T.muted,fontStyle:"italic"}}>📝 {a.notes}</p>}
                   </div>
                 ))}
@@ -1124,7 +1433,7 @@ function ReportsView({fields,activities,onBack}){
                 <span style={{color:T.faint}}>·</span>
                 <span style={{fontSize:"13px",color:meta.color,fontWeight:600}}>{fmtDate(a.date)}</span>
               </div>
-              {renderDetail(a)}
+              {a.type==="scouting"?renderScoutDetail(a.data||{}):renderDetail(a)}
               {a.notes&&<p style={{margin:"8px 0 0",fontSize:"12px",color:T.muted,fontStyle:"italic"}}>📝 {a.notes}</p>}
             </div>
           ))
