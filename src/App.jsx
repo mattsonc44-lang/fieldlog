@@ -1024,33 +1024,11 @@ const parseLegal = (str) => {
 
 // ── Add Field View ────────────────────────────────────────────────────
 function AddFieldView({onBack,onSave}){
-  const[mode,setMode]   =useState("quick");  // "quick" | "manual"
-  const[name,setName]   =useState("");
-  const[acres,setAcres] =useState("");
-  const[legal,setLegal] =useState("");
-  const[boundary,setBdry]=useState(null);
-  const[autoResult,setAutoResult]=useState(null);
-  const[err,setErr]     =useState("");
-
-  const tryParseLegal=(val)=>{
-    setLegal(val); setErr("");
-    const r=parseLegal(val);
-    if(r){ setAutoResult(r); if(!acres) setAcres(r.acres); }
-    else  { setAutoResult(null); }
-  };
-
-  const handleSave=()=>{
-    if(!name.trim()){setErr("Field name is required.");return;}
-    const finalBoundary = mode==="quick" && autoResult ? autoResult.boundary : (boundary||[]);
-    onSave({id:genId(),name:name.trim(),acres,legalDesc:legal,boundary:finalBoundary});
-  };
-
-  const tabBtn=(id,label)=>({
-    ...mkBtn("ghost"),padding:"8px 18px",fontSize:"13px",
-    background:mode===id?T.gold:"transparent",
-    color:mode===id?"#FFFFFF":T.muted,
-    border:`1px solid ${mode===id?T.gold:T.border}`,
-  });
+  const[name,setName]    =useState("");
+  const[acres,setAcres]  =useState("");
+  const[legal,setLegal]  =useState("");
+  const[boundary,setBdry]=useState([]);
+  const[err,setErr]      =useState("");
 
   return(
     <div>
@@ -1059,77 +1037,54 @@ function AddFieldView({onBack,onSave}){
         <h2 style={{fontFamily:"'Playfair Display',serif",fontSize:"22px",margin:0}}>Add New Field</h2>
       </div>
 
-      {/* Mode tabs */}
-      <div style={{display:"flex",gap:"6px",marginBottom:"18px"}}>
-        <button style={tabBtn("quick","⚡ Quick Add")} onClick={()=>setMode("quick")}>⚡ Quick Add</button>
-        <button style={tabBtn("manual","✏️ Draw Manually")} onClick={()=>setMode("manual")}>✏️ Draw Manually</button>
-      </div>
-
+      {/* Field details */}
       <div style={S.card}>
+        <h3 style={S.sh}>Field Details</h3>
         <div style={S.g2}>
           <div style={S.row}>
             <label style={S.label}>Field Name *</label>
-            <input style={S.input} type="text" placeholder="e.g. Home Quarter, North Flat" value={name} onChange={e=>{setName(e.target.value);setErr("");}}/>
+            <input style={S.input} type="text" placeholder="e.g. Home Quarter, North Flat"
+              value={name} onChange={e=>{setName(e.target.value);setErr("");}}/>
           </div>
           <div style={S.row}>
             <label style={S.label}>Acres</label>
-            <input style={S.input} type="number" step="0.1" placeholder="Auto-filled from legal desc" value={acres} onChange={e=>setAcres(e.target.value)}/>
+            <input style={S.input} type="number" step="0.1" placeholder="e.g. 160"
+              value={acres} onChange={e=>setAcres(e.target.value)}/>
           </div>
         </div>
-
-        {/* Legal description with auto-locate */}
         <div style={S.row}>
           <label style={S.label}>Legal Description</label>
-          <div style={{position:"relative"}}>
-            <input style={{...S.input,paddingRight:"110px"}} type="text"
-              placeholder="e.g. NW 12 T34N R15E  or  SW 18-34N-16E"
-              value={legal} onChange={e=>tryParseLegal(e.target.value)}/>
-            {autoResult&&(
-              <span style={{position:"absolute",right:"8px",top:"50%",transform:"translateY(-50%)",fontSize:"11px",color:T.green,fontWeight:700,pointerEvents:"none"}}>✓ Located</span>
-            )}
-          </div>
-          {legal&&!autoResult&&<p style={{margin:"4px 0 0",fontSize:"11px",color:T.muted}}>Try format: NW 12 T34N R15E — quarter section, township N, range E/W</p>}
-          {autoResult&&mode==="quick"&&(
-            <div style={{marginTop:"8px",background:"#F0F8F0",border:`1px solid #A0C8A0`,borderRadius:"6px",padding:"10px 12px",fontSize:"12px",color:"#2A5020"}}>
-              ✓ Boundary auto-calculated from PLSS grid · {autoResult.acres} ac · Center: {autoResult.center[0].toFixed(4)}°N, {Math.abs(autoResult.center[1]).toFixed(4)}°W
-            </div>
-          )}
+          <input style={S.input} type="text" placeholder="e.g. NW-12-34N-15E"
+            value={legal} onChange={e=>setLegal(e.target.value)}/>
         </div>
       </div>
 
-      {/* Quick mode — show preview map centered on result */}
-      {mode==="quick"&&(
-        <div style={S.card}>
-          <h3 style={S.sh}>Preview</h3>
-          {autoResult
-            ?<>
-              <p style={{margin:"0 0 10px",fontSize:"13px",color:T.muted}}>Boundary auto-generated from legal description. You can still edit corners on the map if needed.</p>
-              <FieldMap key={legal} boundary={autoResult.boundary} onBoundaryChange={setBdry} height={320}/>
-            </>
-            :<div style={{textAlign:"center",padding:"32px",color:T.faint,border:`1px dashed ${T.border}`,borderRadius:"8px"}}>
-              <div style={{fontSize:"32px",marginBottom:"8px"}}>📍</div>
-              <p>Enter a legal description above to auto-locate the field</p>
-              <p style={{fontSize:"12px",marginTop:"6px",color:T.faint}}>Format: <strong>NW 12 T34N R15E</strong> &nbsp;·&nbsp; <strong>SW 18 34N 16E</strong> &nbsp;·&nbsp; <strong>NE 5-33N-14E</strong></p>
-            </div>
-          }
-        </div>
-      )}
-
-      {/* Manual mode — full map with click-to-draw */}
-      {mode==="manual"&&(
-        <div style={S.card}>
-          <h3 style={S.sh}>Draw Field Boundary</h3>
-          <p style={{margin:"0 0 12px",fontSize:"13px",color:T.muted}}>Navigate to your field on the satellite map, then click corner points around the boundary.</p>
-          <FieldMap boundary={autoResult?.boundary||[]} onBoundaryChange={setBdry} height={380}/>
-          {boundary?.length>=3&&<p style={{margin:"8px 0 0",fontSize:"12px",color:T.green}}>✓ {boundary.length} points captured</p>}
-        </div>
-      )}
+      {/* Map — click to place boundary points */}
+      <div style={S.card}>
+        <h3 style={S.sh}>Draw Field Boundary</h3>
+        <p style={{margin:"0 0 12px",fontSize:"13px",color:T.muted}}>
+          Navigate to your field on the satellite map, then <strong>click each corner</strong> of the field boundary. Connect at least 3 points to form a polygon.
+        </p>
+        <FieldMap
+          boundary={boundary}
+          onBoundaryChange={setBdry}
+          height={420}
+        />
+        {boundary.length>=3&&(
+          <p style={{margin:"8px 0 0",fontSize:"12px",color:T.green}}>
+            ✓ {boundary.length} points — boundary ready
+          </p>
+        )}
+      </div>
 
       {err&&<p style={{color:"#E05050",fontSize:"13px",margin:"0 0 10px"}}>{err}</p>}
-      <div style={{display:"flex",gap:"8px",justifyContent:"flex-end"}}>
+
+      <div style={{display:"flex",gap:"8px",justifyContent:"flex-end",marginBottom:"20px"}}>
         <button style={mkBtn("ghost")} onClick={onBack}>Cancel</button>
-        <button style={mkBtn("primary")} onClick={handleSave}
-          disabled={mode==="quick"?!name.trim()||!autoResult&&!boundary?.length>=3:!name.trim()}>
+        <button style={mkBtn("primary")} onClick={()=>{
+          if(!name.trim()){setErr("Field name is required.");return;}
+          onSave({id:genId(),name:name.trim(),acres,legalDesc:legal,boundary});
+        }}>
           Create Field
         </button>
       </div>
