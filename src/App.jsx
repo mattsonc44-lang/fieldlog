@@ -183,7 +183,6 @@ function FieldMap({boundary=[],onBoundaryChange,height=350}){
     return 14;
   });
   const [pts,setPts]=useState(boundary.length?[...boundary]:[]);
-  const [saved,setSaved]=useState(false);
   const [W,setW]=useState(600);
   const H=height;
   const mX =(lon,z)=>(lon+180)/360*Math.pow(2,z)*256;
@@ -222,7 +221,7 @@ function FieldMap({boundary=[],onBoundaryChange,height=350}){
   const onMU=()=>{dragRef.current.on=false;};
   const onClick=(e)=>{
     if(dragRef.current.moved) return;
-    const[x,y]=evXY(e); setPts(p=>[...p,px2ll(x,y)]); setSaved(false);
+    const[x,y]=evXY(e); setPts(p=>[...p,px2ll(x,y)]);
   };
   const onWheel=(e)=>{e.preventDefault();setZoom(z=>Math.max(8,Math.min(18,z+(e.deltaY<0?1:-1))));};
   const onTS=(e)=>{if(e.touches.length===1)touchR.current={x:e.touches[0].clientX,y:e.touches[0].clientY,sc:[...ctr],moved:false};};
@@ -236,11 +235,16 @@ function FieldMap({boundary=[],onBoundaryChange,height=350}){
     if(touchR.current.moved||e.changedTouches.length!==1) return;
     const r=wrapRef.current.getBoundingClientRect();
     setPts(p=>[...p,px2ll(e.changedTouches[0].clientX-r.left,e.changedTouches[0].clientY-r.top)]);
-    setSaved(false);
   };
-  const undo =()=>{setPts(p=>p.slice(0,-1));setSaved(false);};
-  const clear=()=>{setPts([]);setSaved(false);};
-  const save =()=>{ if(pts.length>=3&&onBoundaryChange){onBoundaryChange([...pts]);setSaved(true);} };
+  const undo =()=>setPts(p=>p.slice(0,-1));
+  const clear=()=>setPts([]);
+
+  // Auto-save whenever pts changes (3+ points)
+  useEffect(()=>{
+    if(pts.length>=3&&onBoundaryChange) onBoundaryChange([...pts]);
+    else if(pts.length===0&&onBoundaryChange) onBoundaryChange([]);
+  },[pts]);
+
   const nPts=pts.length;
   return(
     <div>
@@ -265,10 +269,11 @@ function FieldMap({boundary=[],onBoundaryChange,height=350}){
         <div style={{position:"absolute",bottom:0,left:0,background:"rgba(0,0,0,0.55)",color:"#bbb",fontSize:"9px",padding:"2px 6px",pointerEvents:"none"}}>z{tz}</div>
       </div>
       <div style={{display:"flex",alignItems:"center",gap:"8px",marginTop:"8px",flexWrap:"wrap"}}>
-        <span style={{flex:1,fontSize:"12px",color:nPts>=3?T.gold:T.muted}}>{nPts<3?`Click to place field corners — ${nPts} point${nPts!==1?"s":""} placed`:`${nPts} points — polygon drawn${saved?" ✓ Saved":""}`}</span>
+        <span style={{flex:1,fontSize:"12px",color:nPts>=3?T.green:T.muted}}>
+          {nPts<3?`Click to place corners — ${nPts} point${nPts!==1?"s":""} placed`:`✓ ${nPts} points — boundary auto-saved`}
+        </span>
         <button style={{...mkBtn("ghost"),padding:"5px 11px",fontSize:"12px"}} onClick={undo}  disabled={!nPts}>Undo</button>
         <button style={{...mkBtn("ghost"),padding:"5px 11px",fontSize:"12px"}} onClick={clear} disabled={!nPts}>Clear</button>
-        <button style={{...mkBtn("primary"),padding:"6px 14px",fontSize:"12px"}} onClick={save} disabled={nPts<3}>✓ Save Boundary</button>
       </div>
     </div>
   );
@@ -871,23 +876,14 @@ function AddActivityModal({field,onClose,onSave}){
 }
 
 // ── Field Detail ──────────────────────────────────────────────────────
-const INSURANCE_PLANS = ["Revenue Protection (RP)","Revenue Protection w/ HPE","Yield Protection (YP)","Actual Production History (APH)","Area Risk Protection Insurance (ARPI)","Whole Farm Revenue Protection (WFRP)","Enhanced Coverage Option (ECO)","Supplemental Coverage Option (SCO)"];
-const COVERAGE_LEVELS = ["50%","55%","60%","65%","70%","75%","80%","85%","86%","87%","88%","89%","90%"];
 
 function FieldDetailView({field,activities,onBack,onAddActivity,onDeleteActivity,onUpdateField,onDeleteField}){
-  const[tab,setTab]         =useState("activities"); // "activities"|"map"|"insurance"
+  const[tab,setTab]         =useState("activities"); // "activities"|"map"
   const[editName,setEditName]=useState(false);
   const[nameVal,setNameVal] =useState(field.name);
   const[acresVal,setAcresVal]=useState(field.acres||"");
   const[filter,setFilter]   =useState("all");
   const[confirmDelete,setConfirmDelete]=useState(false);
-
-  // Insurance state — stored in field.insurance object
-  const ins = field.insurance || {};
-  const setIns = (u) => onUpdateField(field.id, {insurance:{...ins,...u}});
-
-  // Harvest records for yield comparison
-  const harvests = activities.filter(a=>a.fieldId===field.id&&a.type==="harvest");
 
   const all   = activities.filter(a=>a.fieldId===field.id);
   const shown = all.filter(a=>filter==="all"||a.type===filter).sort((a,b)=>new Date(b.date)-new Date(a.date));
@@ -930,7 +926,6 @@ function FieldDetailView({field,activities,onBack,onAddActivity,onDeleteActivity
       <div style={{display:"flex",gap:"6px",marginBottom:"16px",flexWrap:"wrap"}}>
         <button style={tabBtn("activities","📋 Activities")} onClick={()=>setTab("activities")}>📋 Activities</button>
         <button style={tabBtn("map","📍 Map")} onClick={()=>setTab("map")}>📍 Map</button>
-        <button style={{...tabBtn("insurance","🛡 Insurance"),borderColor:ins.planType?T.green:undefined,color:tab==="insurance"?"#FFFFFF":ins.planType?T.green:T.muted}} onClick={()=>setTab("insurance")}>🛡 Insurance{ins.planType&&" ✓"}</button>
       </div>
 
       {/* ── MAP TAB ── */}
@@ -942,130 +937,6 @@ function FieldDetailView({field,activities,onBack,onAddActivity,onDeleteActivity
           </div>
           <FieldMap key={`${field.id}-map`} boundary={field.boundary||[]} onBoundaryChange={(pts)=>onUpdateField(field.id,{boundary:pts})} height={360}/>
           {field.legalDesc&&<p style={{margin:"8px 0 0",fontSize:"12px",color:T.muted}}>Legal: {field.legalDesc}</p>}
-        </div>
-      )}
-
-      {/* ── INSURANCE TAB ── */}
-      {tab==="insurance"&&(
-        <div>
-          {/* Policy info */}
-          <div style={S.card}>
-            <h3 style={S.sh}>🛡 Crop Insurance Coverage</h3>
-            <div style={S.g2}>
-              <div style={S.row}>
-                <label style={S.label}>Insurance Company</label>
-                <input style={S.input} type="text" placeholder="e.g. Crop Risk Services" value={ins.company||""} onChange={e=>setIns({company:e.target.value})}/>
-              </div>
-              <div style={S.row}>
-                <label style={S.label}>Agent Name</label>
-                <input style={S.input} type="text" placeholder="Agent name" value={ins.agent||""} onChange={e=>setIns({agent:e.target.value})}/>
-              </div>
-              <div style={S.row}>
-                <label style={S.label}>Policy Number</label>
-                <input style={S.input} type="text" placeholder="e.g. MT-2025-12345" value={ins.policyNum||""} onChange={e=>setIns({policyNum:e.target.value})}/>
-              </div>
-              <div style={S.row}>
-                <label style={S.label}>Crop Year</label>
-                <input style={S.input} type="number" placeholder={new Date().getFullYear()} value={ins.cropYear||""} onChange={e=>setIns({cropYear:e.target.value})}/>
-              </div>
-            </div>
-          </div>
-
-          {/* Coverage details */}
-          <div style={S.card}>
-            <h3 style={S.sh}>Coverage Details</h3>
-            <div style={S.g2}>
-              <div style={S.row}>
-                <label style={S.label}>Insurance Plan</label>
-                <select style={S.input} value={ins.planType||""} onChange={e=>setIns({planType:e.target.value})}>
-                  <option value="">Select plan…</option>
-                  {INSURANCE_PLANS.map(p=><option key={p}>{p}</option>)}
-                </select>
-              </div>
-              <div style={S.row}>
-                <label style={S.label}>Coverage Level</label>
-                <select style={S.input} value={ins.coverageLevel||""} onChange={e=>setIns({coverageLevel:e.target.value})}>
-                  <option value="">Select level…</option>
-                  {COVERAGE_LEVELS.map(l=><option key={l}>{l}</option>)}
-                </select>
-              </div>
-              <div style={S.row}>
-                <label style={S.label}>Insured Crop</label>
-                <select style={S.input} value={ins.insuredCrop||""} onChange={e=>setIns({insuredCrop:e.target.value})}>
-                  <option value="">Select crop…</option>
-                  {CROPS.map(c=><option key={c}>{c}</option>)}
-                </select>
-              </div>
-              <div style={S.row}>
-                <label style={S.label}>Practice</label>
-                <select style={S.input} value={ins.practice||""} onChange={e=>setIns({practice:e.target.value})}>
-                  <option value="">Select…</option>
-                  {["Irrigated","Non-Irrigated","Summer Fallow","Continuous Cropping"].map(p=><option key={p}>{p}</option>)}
-                </select>
-              </div>
-              <div style={S.row}>
-                <label style={S.label}>Insured Acres</label>
-                <input style={S.input} type="number" step="0.1" placeholder={field.acres||"Acres"} value={ins.insuredAcres||""} onChange={e=>setIns({insuredAcres:e.target.value})}/>
-              </div>
-              <div style={S.row}>
-                <label style={S.label}>Premium (est.)</label>
-                <input style={S.input} type="text" placeholder="e.g. $2,400 / $15.00 ac" value={ins.premium||""} onChange={e=>setIns({premium:e.target.value})}/>
-              </div>
-            </div>
-          </div>
-
-          {/* APH — Actual Production History */}
-          <div style={S.card}>
-            <h3 style={S.sh}>APH — Actual Production History</h3>
-            <div style={S.g2}>
-              <div style={S.row}>
-                <label style={S.label}>APH Yield (bu/ac)</label>
-                <input style={S.input} type="number" step="0.1" placeholder="e.g. 42" value={ins.aphYield||""} onChange={e=>setIns({aphYield:e.target.value})}/>
-              </div>
-              <div style={S.row}>
-                <label style={S.label}>Guaranteed Yield (bu/ac)</label>
-                <input style={S.input} type="number" step="0.1" placeholder="APH × coverage %" value={ins.guaranteedYield||ins.aphYield&&ins.coverageLevel?(parseFloat(ins.aphYield)*(parseFloat(ins.coverageLevel)/100)).toFixed(1):""}
-                  onChange={e=>setIns({guaranteedYield:e.target.value})}/>
-              </div>
-              <div style={S.row}>
-                <label style={S.label}>Projected Price ($/bu)</label>
-                <input style={S.input} type="number" step="0.01" placeholder="e.g. 6.50" value={ins.projectedPrice||""} onChange={e=>setIns({projectedPrice:e.target.value})}/>
-              </div>
-              <div style={S.row}>
-                <label style={S.label}>Harvest Price ($/bu)</label>
-                <input style={S.input} type="number" step="0.01" placeholder="Filled at harvest" value={ins.harvestPrice||""} onChange={e=>setIns({harvestPrice:e.target.value})}/>
-              </div>
-            </div>
-            {/* Auto-calculated indemnity estimate */}
-            {ins.aphYield&&ins.coverageLevel&&ins.projectedPrice&&(()=>{
-              const aph=parseFloat(ins.aphYield), cov=parseFloat(ins.coverageLevel)/100;
-              const guaranteed=ins.guaranteedYield?parseFloat(ins.guaranteedYield):aph*cov;
-              const price=parseFloat(ins.harvestPrice||ins.projectedPrice);
-              const acres=parseFloat(ins.insuredAcres||field.acres||0);
-              const liability=(guaranteed*price*acres).toFixed(0);
-              return(
-                <div style={{background:"#F0F8F0",border:`1px solid #A0C8A0`,borderRadius:"6px",padding:"12px",display:"flex",gap:"20px",flexWrap:"wrap"}}>
-                  <div style={{textAlign:"center"}}><div style={{fontSize:"18px",fontWeight:700,color:T.green}}>{guaranteed.toFixed(1)}</div><div style={{fontSize:"11px",color:T.muted}}>bu/ac guaranteed</div></div>
-                  <div style={{textAlign:"center"}}><div style={{fontSize:"18px",fontWeight:700,color:T.green}}>${Number(liability).toLocaleString()}</div><div style={{fontSize:"11px",color:T.muted}}>max liability ({ins.insuredAcres||field.acres||"?"} ac)</div></div>
-                  {ins.harvestPrice&&parseFloat(ins.harvestPrice)<parseFloat(ins.projectedPrice)&&(
-                    <div style={{textAlign:"center"}}>
-                      <div style={{fontSize:"18px",fontWeight:700,color:"#C07010"}}>${((parseFloat(ins.projectedPrice)-parseFloat(ins.harvestPrice))*guaranteed*(parseFloat(ins.insuredAcres||field.acres||0))).toFixed(0)}</div>
-                      <div style={{fontSize:"11px",color:T.muted}}>est. price indemnity</div>
-                    </div>
-                  )}
-                </div>
-              );
-            })()}
-          </div>
-
-          {/* Notes */}
-          <div style={S.card}>
-            <div style={S.row}>
-              <label style={S.label}>Insurance Notes</label>
-              <textarea style={{...S.input,height:"70px",resize:"vertical"}} placeholder="FSA tract numbers, special provisions, notes from agent…" value={ins.notes||""} onChange={e=>setIns({notes:e.target.value})}/>
-            </div>
-            <p style={{margin:0,fontSize:"11px",color:T.muted}}>💡 Insurance data saves automatically as you type.</p>
-          </div>
         </div>
       )}
 
