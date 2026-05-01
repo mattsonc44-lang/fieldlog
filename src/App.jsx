@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import JSZip from "jszip";
 
 // ╔══════════════════════════════════════════════════════════════════════╗
 // ║  FIREBASE CONFIG — paste your project values here                  ║
@@ -985,8 +986,20 @@ function ImportFieldsModal({onClose,onImport}){
         processFields(parseGeoJSONFields(await file.text()));
       } else if(ext==="kml"){
         processFields(parseKMLFields(await file.text()));
+      } else if(ext==="kmz"){
+        // KMZ is a ZIP containing one or more .kml files
+        const zip=await JSZip.loadAsync(await file.arrayBuffer());
+        const kmlFiles=Object.values(zip.files).filter(f=>f.name.toLowerCase().endsWith(".kml")&&!f.dir);
+        if(!kmlFiles.length) throw new Error("No .kml file found inside the KMZ archive.");
+        // Combine all KML files (usually just one — doc.kml)
+        const allFields=[];
+        for(const kmlFile of kmlFiles){
+          const kmlText=await kmlFile.async("text");
+          allFields.push(...parseKMLFields(kmlText));
+        }
+        processFields(allFields);
       } else {
-        setErr(`Unsupported format: .${ext} — please use .geojson, .json, or .kml`);
+        setErr(`Unsupported format: .${ext} — please use .kmz, .kml, .geojson, or .json`);
       }
     }catch(e){ setErr("Could not parse file: "+e.message); }
     finally{ setBusy(false); }
@@ -1131,17 +1144,17 @@ Reply ONLY with valid JSON, no markdown fences:
               <div style={{background:"#F8F4EC",border:`1px dashed ${T.borderHi}`,borderRadius:"8px",padding:"24px",textAlign:"center",marginBottom:"14px"}}>
                 <div style={{fontSize:"32px",marginBottom:"8px"}}>📂</div>
                 <p style={{color:T.text,fontWeight:600,marginBottom:"4px"}}>Drop your FSA / CLU file here</p>
-                <p style={{color:T.muted,fontSize:"12px",marginBottom:"16px"}}>Supports .geojson  ·  .json  ·  .kml</p>
+                <p style={{color:T.muted,fontSize:"12px",marginBottom:"16px"}}>Supports .kmz  ·  .kml  ·  .geojson  ·  .json</p>
                 <label style={{...mkBtn("primary"),cursor:"pointer"}}>
                   Choose File
-                  <input type="file" accept=".geojson,.json,.kml" style={{display:"none"}} onChange={handleFile} disabled={busy}/>
+                  <input type="file" accept=".kmz,.kml,.geojson,.json" style={{display:"none"}} onChange={handleFile} disabled={busy}/>
                 </label>
               </div>
               <div style={{background:"#F5F5EC",border:`1px solid #D8D8B0`,borderRadius:"8px",padding:"12px",fontSize:"12px",color:T.muted}}>
                 <p style={{margin:"0 0 6px",fontWeight:600,color:"#6A6830"}}>📋 How to get your FSA file</p>
                 <p style={{margin:"0 0 4px"}}>1. Go to <strong style={{color:T.text}}>fsa.usda.gov</strong> → your local service center</p>
                 <p style={{margin:"0 0 4px"}}>2. Or download from <strong style={{color:T.text}}>datagateway.nrcs.usda.gov</strong></p>
-                <p style={{margin:0}}>3. Request your CLU (Common Land Unit) boundaries as GeoJSON</p>
+                <p style={{margin:"0 0 4px"}}>3. Request your CLU (Common Land Unit) boundaries — use <strong style={{color:T.text}}>KMZ</strong> format</p>
               </div>
             </div>
           )}
