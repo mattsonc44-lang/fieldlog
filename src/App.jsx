@@ -871,16 +871,40 @@ function AddActivityModal({field,onClose,onSave}){
 }
 
 // ── Field Detail ──────────────────────────────────────────────────────
+const INSURANCE_PLANS = ["Revenue Protection (RP)","Revenue Protection w/ HPE","Yield Protection (YP)","Actual Production History (APH)","Area Risk Protection Insurance (ARPI)","Whole Farm Revenue Protection (WFRP)","Enhanced Coverage Option (ECO)","Supplemental Coverage Option (SCO)"];
+const COVERAGE_LEVELS = ["50%","55%","60%","65%","70%","75%","80%","85%","86%","87%","88%","89%","90%"];
+
 function FieldDetailView({field,activities,onBack,onAddActivity,onDeleteActivity,onUpdateField,onDeleteField}){
-  const[mapOpen,setMapOpen]=useState(field.boundary?.length>=3);const[editName,setEditName]=useState(false);
-  const[nameVal,setNameVal]=useState(field.name);const[acresVal,setAcresVal]=useState(field.acres||"");
-  const[filter,setFilter]=useState("all");const[confirmDelete,setConfirmDelete]=useState(false);
-  const all=activities.filter(a=>a.fieldId===field.id);
-  const shown=all.filter(a=>filter==="all"||a.type===filter).sort((a,b)=>new Date(b.date)-new Date(a.date));
-  const stats=Object.entries(ACTIVITY_META).map(([k,m])=>({...m,key:k,n:all.filter(a=>a.type===k).length})).filter(x=>x.n>0);
+  const[tab,setTab]         =useState("activities"); // "activities"|"map"|"insurance"
+  const[editName,setEditName]=useState(false);
+  const[nameVal,setNameVal] =useState(field.name);
+  const[acresVal,setAcresVal]=useState(field.acres||"");
+  const[filter,setFilter]   =useState("all");
+  const[confirmDelete,setConfirmDelete]=useState(false);
+
+  // Insurance state — stored in field.insurance object
+  const ins = field.insurance || {};
+  const setIns = (u) => onUpdateField(field.id, {insurance:{...ins,...u}});
+
+  // Harvest records for yield comparison
+  const harvests = activities.filter(a=>a.fieldId===field.id&&a.type==="harvest");
+
+  const all   = activities.filter(a=>a.fieldId===field.id);
+  const shown = all.filter(a=>filter==="all"||a.type===filter).sort((a,b)=>new Date(b.date)-new Date(a.date));
+  const stats = Object.entries(ACTIVITY_META).map(([k,m])=>({...m,key:k,n:all.filter(a=>a.type===k).length})).filter(x=>x.n>0);
+
+  const tabBtn=(id,label)=>({
+    ...mkBtn("ghost"),padding:"7px 16px",fontSize:"13px",
+    background:tab===id?T.gold:"transparent",
+    color:tab===id?"#FFFFFF":T.muted,
+    border:`1px solid ${tab===id?T.gold:T.border}`,
+    borderRadius:"6px",
+  });
+
   return(
     <div>
-      <div style={{display:"flex",alignItems:"center",gap:"10px",marginBottom:"18px",flexWrap:"wrap"}}>
+      {/* Header */}
+      <div style={{display:"flex",alignItems:"center",gap:"10px",marginBottom:"14px",flexWrap:"wrap"}}>
         <button style={{...mkBtn("ghost"),padding:"6px 12px"}} onClick={onBack}>← Fields</button>
         {!editName
           ?<><h2 style={{fontFamily:"'Playfair Display',serif",fontSize:"22px",margin:0,flex:1}}>{field.name}</h2>{field.acres&&<span style={{color:T.muted,fontSize:"14px"}}>{field.acres} ac</span>}<button style={{...mkBtn("ghost"),padding:"5px 10px",fontSize:"12px"}} onClick={()=>setEditName(true)}>✏️ Edit</button></>
@@ -899,58 +923,344 @@ function FieldDetailView({field,activities,onBack,onAddActivity,onDeleteActivity
         </div>
       )}
 
+      {/* Activity summary badges */}
       {stats.length>0&&<div style={{display:"flex",gap:"8px",flexWrap:"wrap",marginBottom:"14px"}}>{stats.map(s=><div key={s.key} style={{padding:"5px 12px",borderRadius:"20px",background:T.card,border:`1px solid ${s.color}40`,fontSize:"12px",display:"flex",gap:"5px",alignItems:"center"}}><span>{s.icon}</span><span style={{color:s.color,fontWeight:700}}>{s.n}×</span><span style={{color:T.muted}}>{s.label}</span></div>)}</div>}
-      <div style={S.card}>
-        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-          <span style={{fontWeight:700,color:T.gold,fontSize:"13px"}}>📍 Field Boundary</span>
-          <button style={{...mkBtn("ghost"),padding:"4px 10px",fontSize:"12px"}} onClick={()=>setMapOpen(o=>!o)}>
-            {mapOpen?"Hide Map":field.boundary?.length?"View / Edit Map":"Draw Boundary"}
-          </button>
+
+      {/* Tab bar */}
+      <div style={{display:"flex",gap:"6px",marginBottom:"16px",flexWrap:"wrap"}}>
+        <button style={tabBtn("activities","📋 Activities")} onClick={()=>setTab("activities")}>📋 Activities</button>
+        <button style={tabBtn("map","📍 Map")} onClick={()=>setTab("map")}>📍 Map</button>
+        <button style={{...tabBtn("insurance","🛡 Insurance"),borderColor:ins.planType?T.green:undefined,color:tab==="insurance"?"#FFFFFF":ins.planType?T.green:T.muted}} onClick={()=>setTab("insurance")}>🛡 Insurance{ins.planType&&" ✓"}</button>
+      </div>
+
+      {/* ── MAP TAB ── */}
+      {tab==="map"&&(
+        <div style={S.card}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"12px"}}>
+            <span style={{fontWeight:700,color:T.gold,fontSize:"13px"}}>📍 Field Boundary</span>
+            <span style={{fontSize:"12px",color:T.muted}}>{field.boundary?.length>=3?`${field.boundary.length} corner points`:"No boundary yet"}</span>
+          </div>
+          <FieldMap key={`${field.id}-map`} boundary={field.boundary||[]} onBoundaryChange={(pts)=>onUpdateField(field.id,{boundary:pts})} height={360}/>
+          {field.legalDesc&&<p style={{margin:"8px 0 0",fontSize:"12px",color:T.muted}}>Legal: {field.legalDesc}</p>}
         </div>
-        {!mapOpen&&<p style={{margin:"6px 0 0",fontSize:"12px",color:T.muted}}>{field.boundary?.length>=3?`Boundary set — ${field.boundary.length} corner points`:"No boundary drawn yet."}</p>}
-        {mapOpen&&<div style={{marginTop:"12px"}}><FieldMap key={`${field.id}-map`} boundary={field.boundary||[]} onBoundaryChange={(pts)=>{onUpdateField(field.id,{boundary:pts});}} height={320}/></div>}
-      </div>
-      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"10px",marginTop:"4px"}}>
-        <h3 style={{fontFamily:"'Playfair Display',serif",fontSize:"16px",margin:0,color:T.gold}}>Activity Log</h3>
-        <select style={{...S.input,width:"auto",padding:"5px 10px",fontSize:"12px"}} value={filter} onChange={e=>setFilter(e.target.value)}>
-          <option value="all">All Types</option>
-          {Object.entries(ACTIVITY_META).map(([k,m])=><option key={k} value={k}>{m.icon} {m.label}</option>)}
-        </select>
-      </div>
-      {shown.length===0&&<div style={{...S.card,textAlign:"center",padding:"36px",color:T.faint}}>{all.length===0?"No activities logged yet. Click \"+ Log Activity\" to get started.":"No activities match this filter."}</div>}
-      {shown.map(a=><ActivityCard key={a.id} activity={a} onDelete={onDeleteActivity}/>)}
+      )}
+
+      {/* ── INSURANCE TAB ── */}
+      {tab==="insurance"&&(
+        <div>
+          {/* Policy info */}
+          <div style={S.card}>
+            <h3 style={S.sh}>🛡 Crop Insurance Coverage</h3>
+            <div style={S.g2}>
+              <div style={S.row}>
+                <label style={S.label}>Insurance Company</label>
+                <input style={S.input} type="text" placeholder="e.g. Crop Risk Services" value={ins.company||""} onChange={e=>setIns({company:e.target.value})}/>
+              </div>
+              <div style={S.row}>
+                <label style={S.label}>Agent Name</label>
+                <input style={S.input} type="text" placeholder="Agent name" value={ins.agent||""} onChange={e=>setIns({agent:e.target.value})}/>
+              </div>
+              <div style={S.row}>
+                <label style={S.label}>Policy Number</label>
+                <input style={S.input} type="text" placeholder="e.g. MT-2025-12345" value={ins.policyNum||""} onChange={e=>setIns({policyNum:e.target.value})}/>
+              </div>
+              <div style={S.row}>
+                <label style={S.label}>Crop Year</label>
+                <input style={S.input} type="number" placeholder={new Date().getFullYear()} value={ins.cropYear||""} onChange={e=>setIns({cropYear:e.target.value})}/>
+              </div>
+            </div>
+          </div>
+
+          {/* Coverage details */}
+          <div style={S.card}>
+            <h3 style={S.sh}>Coverage Details</h3>
+            <div style={S.g2}>
+              <div style={S.row}>
+                <label style={S.label}>Insurance Plan</label>
+                <select style={S.input} value={ins.planType||""} onChange={e=>setIns({planType:e.target.value})}>
+                  <option value="">Select plan…</option>
+                  {INSURANCE_PLANS.map(p=><option key={p}>{p}</option>)}
+                </select>
+              </div>
+              <div style={S.row}>
+                <label style={S.label}>Coverage Level</label>
+                <select style={S.input} value={ins.coverageLevel||""} onChange={e=>setIns({coverageLevel:e.target.value})}>
+                  <option value="">Select level…</option>
+                  {COVERAGE_LEVELS.map(l=><option key={l}>{l}</option>)}
+                </select>
+              </div>
+              <div style={S.row}>
+                <label style={S.label}>Insured Crop</label>
+                <select style={S.input} value={ins.insuredCrop||""} onChange={e=>setIns({insuredCrop:e.target.value})}>
+                  <option value="">Select crop…</option>
+                  {CROPS.map(c=><option key={c}>{c}</option>)}
+                </select>
+              </div>
+              <div style={S.row}>
+                <label style={S.label}>Practice</label>
+                <select style={S.input} value={ins.practice||""} onChange={e=>setIns({practice:e.target.value})}>
+                  <option value="">Select…</option>
+                  {["Irrigated","Non-Irrigated","Summer Fallow","Continuous Cropping"].map(p=><option key={p}>{p}</option>)}
+                </select>
+              </div>
+              <div style={S.row}>
+                <label style={S.label}>Insured Acres</label>
+                <input style={S.input} type="number" step="0.1" placeholder={field.acres||"Acres"} value={ins.insuredAcres||""} onChange={e=>setIns({insuredAcres:e.target.value})}/>
+              </div>
+              <div style={S.row}>
+                <label style={S.label}>Premium (est.)</label>
+                <input style={S.input} type="text" placeholder="e.g. $2,400 / $15.00 ac" value={ins.premium||""} onChange={e=>setIns({premium:e.target.value})}/>
+              </div>
+            </div>
+          </div>
+
+          {/* APH — Actual Production History */}
+          <div style={S.card}>
+            <h3 style={S.sh}>APH — Actual Production History</h3>
+            <div style={S.g2}>
+              <div style={S.row}>
+                <label style={S.label}>APH Yield (bu/ac)</label>
+                <input style={S.input} type="number" step="0.1" placeholder="e.g. 42" value={ins.aphYield||""} onChange={e=>setIns({aphYield:e.target.value})}/>
+              </div>
+              <div style={S.row}>
+                <label style={S.label}>Guaranteed Yield (bu/ac)</label>
+                <input style={S.input} type="number" step="0.1" placeholder="APH × coverage %" value={ins.guaranteedYield||ins.aphYield&&ins.coverageLevel?(parseFloat(ins.aphYield)*(parseFloat(ins.coverageLevel)/100)).toFixed(1):""}
+                  onChange={e=>setIns({guaranteedYield:e.target.value})}/>
+              </div>
+              <div style={S.row}>
+                <label style={S.label}>Projected Price ($/bu)</label>
+                <input style={S.input} type="number" step="0.01" placeholder="e.g. 6.50" value={ins.projectedPrice||""} onChange={e=>setIns({projectedPrice:e.target.value})}/>
+              </div>
+              <div style={S.row}>
+                <label style={S.label}>Harvest Price ($/bu)</label>
+                <input style={S.input} type="number" step="0.01" placeholder="Filled at harvest" value={ins.harvestPrice||""} onChange={e=>setIns({harvestPrice:e.target.value})}/>
+              </div>
+            </div>
+            {/* Auto-calculated indemnity estimate */}
+            {ins.aphYield&&ins.coverageLevel&&ins.projectedPrice&&(()=>{
+              const aph=parseFloat(ins.aphYield), cov=parseFloat(ins.coverageLevel)/100;
+              const guaranteed=ins.guaranteedYield?parseFloat(ins.guaranteedYield):aph*cov;
+              const price=parseFloat(ins.harvestPrice||ins.projectedPrice);
+              const acres=parseFloat(ins.insuredAcres||field.acres||0);
+              const liability=(guaranteed*price*acres).toFixed(0);
+              return(
+                <div style={{background:"#F0F8F0",border:`1px solid #A0C8A0`,borderRadius:"6px",padding:"12px",display:"flex",gap:"20px",flexWrap:"wrap"}}>
+                  <div style={{textAlign:"center"}}><div style={{fontSize:"18px",fontWeight:700,color:T.green}}>{guaranteed.toFixed(1)}</div><div style={{fontSize:"11px",color:T.muted}}>bu/ac guaranteed</div></div>
+                  <div style={{textAlign:"center"}}><div style={{fontSize:"18px",fontWeight:700,color:T.green}}>${Number(liability).toLocaleString()}</div><div style={{fontSize:"11px",color:T.muted}}>max liability ({ins.insuredAcres||field.acres||"?"} ac)</div></div>
+                  {ins.harvestPrice&&parseFloat(ins.harvestPrice)<parseFloat(ins.projectedPrice)&&(
+                    <div style={{textAlign:"center"}}>
+                      <div style={{fontSize:"18px",fontWeight:700,color:"#C07010"}}>${((parseFloat(ins.projectedPrice)-parseFloat(ins.harvestPrice))*guaranteed*(parseFloat(ins.insuredAcres||field.acres||0))).toFixed(0)}</div>
+                      <div style={{fontSize:"11px",color:T.muted}}>est. price indemnity</div>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+          </div>
+
+          {/* Notes */}
+          <div style={S.card}>
+            <div style={S.row}>
+              <label style={S.label}>Insurance Notes</label>
+              <textarea style={{...S.input,height:"70px",resize:"vertical"}} placeholder="FSA tract numbers, special provisions, notes from agent…" value={ins.notes||""} onChange={e=>setIns({notes:e.target.value})}/>
+            </div>
+            <p style={{margin:0,fontSize:"11px",color:T.muted}}>💡 Insurance data saves automatically as you type.</p>
+          </div>
+        </div>
+      )}
+
+      {/* ── ACTIVITIES TAB ── */}
+      {tab==="activities"&&(
+        <>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"10px"}}>
+            <h3 style={{fontFamily:"'Playfair Display',serif",fontSize:"16px",margin:0,color:T.gold}}>Activity Log</h3>
+            <select style={{...S.input,width:"auto",padding:"5px 10px",fontSize:"12px"}} value={filter} onChange={e=>setFilter(e.target.value)}>
+              <option value="all">All Types</option>
+              {Object.entries(ACTIVITY_META).map(([k,m])=><option key={k} value={k}>{m.icon} {m.label}</option>)}
+            </select>
+          </div>
+          {shown.length===0&&<div style={{...S.card,textAlign:"center",padding:"36px",color:T.faint}}>{all.length===0?"No activities logged yet. Click \"+ Log Activity\" to get started.":"No activities match this filter."}</div>}
+          {shown.map(a=><ActivityCard key={a.id} activity={a} onDelete={onDeleteActivity}/>)}
+        </>
+      )}
     </div>
   );
 }
 
+// ── PLSS legal description → boundary calculator ─────────────────────
+// Montana Principal Meridian anchor
+const MT_MERIDIAN = { lat: 45.7764, lng: -111.0667 };
+const DEG_PER_TWP = 0.08682;   // ~6 miles latitude
+const DEG_PER_RNG = 0.10853;   // ~6 miles longitude at ~48°N
+
+// Section layout within a township (1-36, boustrophedon)
+const SECTION_ROW_COL = {};
+const rows = [[1,2,3,4,5,6],[12,11,10,9,8,7],[13,14,15,16,17,18],[24,23,22,21,20,19],[25,26,27,28,29,30],[36,35,34,33,32,31]];
+rows.forEach((row,r)=>row.forEach((sec,c)=>{ SECTION_ROW_COL[sec]={r,c}; }));
+
+const parseLegal = (str) => {
+  if(!str) return null;
+  const s = str.toUpperCase().replace(/[^A-Z0-9\s]/g," ").replace(/\s+/g," ").trim();
+  // Quarter: NW NE SW SE or N½ S½ E½ W½
+  const qMatch = s.match(/\b(NW|NE|SW|SE|N2|S2|E2|W2|N1|S1|E1|W1)\b/);
+  // Section
+  const secMatch = s.match(/\bSEC(?:TION)?\s*(\d{1,2})\b|^(\d{1,2})\b/);
+  // Township: T34N or 34N
+  const twpMatch = s.match(/T?\s*(\d{1,3})\s*N\b/i);
+  // Range: R15E or R15W
+  const rngMatch = s.match(/R?\s*(\d{1,3})\s*([EW])\b/i);
+  if(!twpMatch||!rngMatch) return null;
+  const twp = parseInt(twpMatch[1]);
+  const rng = parseInt(rngMatch[1]);
+  const rngDir = rngMatch[2].toUpperCase();
+  const sec = secMatch ? parseInt(secMatch[1]||secMatch[2]) : 1;
+  const quarter = qMatch ? qMatch[1] : null;
+  if(sec<1||sec>36) return null;
+
+  // SW corner of township
+  const twpSW_lat = MT_MERIDIAN.lat + (twp-1)*DEG_PER_TWP;
+  const rngOffset = rngDir==="E" ? (rng-1)*DEG_PER_RNG : -(rng)*DEG_PER_RNG;
+  const twpSW_lng = MT_MERIDIAN.lng + rngOffset;
+
+  // Section SW corner within township
+  const {r,c} = SECTION_ROW_COL[sec] || {r:0,c:0};
+  const secH = DEG_PER_TWP/6, secW = DEG_PER_RNG/6;
+  // Rows go S→N (row 0 is north), cols go W→E
+  const secSW_lat = twpSW_lat + (5-r)*secH;
+  const secSW_lng = twpSW_lng + c*secW;
+
+  // Quarter section
+  let minLat=secSW_lat, maxLat=secSW_lat+secH;
+  let minLng=secSW_lng, maxLng=secSW_lng+secW;
+  if(quarter){
+    const midLat=(minLat+maxLat)/2, midLng=(minLng+maxLng)/2;
+    if(quarter==="NW"||quarter==="N1"||quarter==="N2"){ minLat=midLat; }
+    if(quarter==="SW"||quarter==="S1"||quarter==="S2"){ maxLat=midLat; }
+    if(quarter==="NE"||quarter==="SE"||quarter==="E1"||quarter==="E2"){ minLng=midLng; }
+    if(quarter==="NW"||quarter==="SW"||quarter==="W1"||quarter==="W2"){ maxLng=midLng; }
+    if(quarter==="NE"){ minLat=midLat; minLng=midLng; }
+    if(quarter==="SW"){ maxLat=midLat; maxLng=midLng; }
+    if(quarter==="SE"){ maxLat=midLat; minLng=midLng; }
+    if(quarter==="NW"){ minLat=midLat; maxLng=midLng; }
+  }
+  const acres = quarter ? 160 : 640;
+  return {
+    boundary:[[minLat,minLng],[minLat,maxLng],[maxLat,maxLng],[maxLat,minLng]],
+    center:[(minLat+maxLat)/2,(minLng+maxLng)/2],
+    acres: String(acres),
+  };
+};
+
 // ── Add Field View ────────────────────────────────────────────────────
 function AddFieldView({onBack,onSave}){
-  const[name,setName]=useState("");const[acres,setAcres]=useState("");const[legal,setLegal]=useState("");
-  const[boundary,setBdry]=useState(null);const[err,setErr]=useState("");
+  const[mode,setMode]   =useState("quick");  // "quick" | "manual"
+  const[name,setName]   =useState("");
+  const[acres,setAcres] =useState("");
+  const[legal,setLegal] =useState("");
+  const[boundary,setBdry]=useState(null);
+  const[autoResult,setAutoResult]=useState(null);
+  const[err,setErr]     =useState("");
+
+  const tryParseLegal=(val)=>{
+    setLegal(val); setErr("");
+    const r=parseLegal(val);
+    if(r){ setAutoResult(r); if(!acres) setAcres(r.acres); }
+    else  { setAutoResult(null); }
+  };
+
+  const handleSave=()=>{
+    if(!name.trim()){setErr("Field name is required.");return;}
+    const finalBoundary = mode==="quick" && autoResult ? autoResult.boundary : (boundary||[]);
+    onSave({id:genId(),name:name.trim(),acres,legalDesc:legal,boundary:finalBoundary});
+  };
+
+  const tabBtn=(id,label)=>({
+    ...mkBtn("ghost"),padding:"8px 18px",fontSize:"13px",
+    background:mode===id?T.gold:"transparent",
+    color:mode===id?"#FFFFFF":T.muted,
+    border:`1px solid ${mode===id?T.gold:T.border}`,
+  });
+
   return(
     <div>
       <div style={{display:"flex",alignItems:"center",gap:"10px",marginBottom:"20px"}}>
         <button style={{...mkBtn("ghost"),padding:"6px 12px"}} onClick={onBack}>← Back</button>
         <h2 style={{fontFamily:"'Playfair Display',serif",fontSize:"22px",margin:0}}>Add New Field</h2>
       </div>
+
+      {/* Mode tabs */}
+      <div style={{display:"flex",gap:"6px",marginBottom:"18px"}}>
+        <button style={tabBtn("quick","⚡ Quick Add")} onClick={()=>setMode("quick")}>⚡ Quick Add</button>
+        <button style={tabBtn("manual","✏️ Draw Manually")} onClick={()=>setMode("manual")}>✏️ Draw Manually</button>
+      </div>
+
       <div style={S.card}>
-        <h3 style={S.sh}>Field Details</h3>
         <div style={S.g2}>
-          <div style={S.row}><label style={S.label}>Field Name *</label><input style={S.input} type="text" placeholder="e.g. North Half, Home Quarter" value={name} onChange={e=>{setName(e.target.value);setErr("");}}/></div>
-          <div style={S.row}><label style={S.label}>Acres</label><input style={S.input} type="number" step="0.1" placeholder="e.g. 320" value={acres} onChange={e=>setAcres(e.target.value)}/></div>
+          <div style={S.row}>
+            <label style={S.label}>Field Name *</label>
+            <input style={S.input} type="text" placeholder="e.g. Home Quarter, North Flat" value={name} onChange={e=>{setName(e.target.value);setErr("");}}/>
+          </div>
+          <div style={S.row}>
+            <label style={S.label}>Acres</label>
+            <input style={S.input} type="number" step="0.1" placeholder="Auto-filled from legal desc" value={acres} onChange={e=>setAcres(e.target.value)}/>
+          </div>
         </div>
-        <div style={S.row}><label style={S.label}>Legal Description</label><input style={S.input} type="text" placeholder="e.g. NW-12-34-15-W4" value={legal} onChange={e=>setLegal(e.target.value)}/></div>
+
+        {/* Legal description with auto-locate */}
+        <div style={S.row}>
+          <label style={S.label}>Legal Description</label>
+          <div style={{position:"relative"}}>
+            <input style={{...S.input,paddingRight:"110px"}} type="text"
+              placeholder="e.g. NW 12 T34N R15E  or  SW 18-34N-16E"
+              value={legal} onChange={e=>tryParseLegal(e.target.value)}/>
+            {autoResult&&(
+              <span style={{position:"absolute",right:"8px",top:"50%",transform:"translateY(-50%)",fontSize:"11px",color:T.green,fontWeight:700,pointerEvents:"none"}}>✓ Located</span>
+            )}
+          </div>
+          {legal&&!autoResult&&<p style={{margin:"4px 0 0",fontSize:"11px",color:T.muted}}>Try format: NW 12 T34N R15E — quarter section, township N, range E/W</p>}
+          {autoResult&&mode==="quick"&&(
+            <div style={{marginTop:"8px",background:"#F0F8F0",border:`1px solid #A0C8A0`,borderRadius:"6px",padding:"10px 12px",fontSize:"12px",color:"#2A5020"}}>
+              ✓ Boundary auto-calculated from PLSS grid · {autoResult.acres} ac · Center: {autoResult.center[0].toFixed(4)}°N, {Math.abs(autoResult.center[1]).toFixed(4)}°W
+            </div>
+          )}
+        </div>
       </div>
-      <div style={S.card}>
-        <h3 style={S.sh}>Draw Field Boundary</h3>
-        <p style={{margin:"0 0 12px",fontSize:"13px",color:T.muted}}>Navigate to your field on the satellite map, then click corner points around the boundary.</p>
-        <FieldMap onBoundaryChange={setBdry} height={380}/>
-        {boundary?.length>=3&&<p style={{margin:"8px 0 0",fontSize:"12px",color:T.green}}>✓ Boundary captured — {boundary.length} points</p>}
-      </div>
-      {err&&<p style={{color:"#E05050",fontSize:"13px"}}>{err}</p>}
+
+      {/* Quick mode — show preview map centered on result */}
+      {mode==="quick"&&(
+        <div style={S.card}>
+          <h3 style={S.sh}>Preview</h3>
+          {autoResult
+            ?<>
+              <p style={{margin:"0 0 10px",fontSize:"13px",color:T.muted}}>Boundary auto-generated from legal description. You can still edit corners on the map if needed.</p>
+              <FieldMap key={legal} boundary={autoResult.boundary} onBoundaryChange={setBdry} height={320}/>
+            </>
+            :<div style={{textAlign:"center",padding:"32px",color:T.faint,border:`1px dashed ${T.border}`,borderRadius:"8px"}}>
+              <div style={{fontSize:"32px",marginBottom:"8px"}}>📍</div>
+              <p>Enter a legal description above to auto-locate the field</p>
+              <p style={{fontSize:"12px",marginTop:"6px",color:T.faint}}>Format: <strong>NW 12 T34N R15E</strong> &nbsp;·&nbsp; <strong>SW 18 34N 16E</strong> &nbsp;·&nbsp; <strong>NE 5-33N-14E</strong></p>
+            </div>
+          }
+        </div>
+      )}
+
+      {/* Manual mode — full map with click-to-draw */}
+      {mode==="manual"&&(
+        <div style={S.card}>
+          <h3 style={S.sh}>Draw Field Boundary</h3>
+          <p style={{margin:"0 0 12px",fontSize:"13px",color:T.muted}}>Navigate to your field on the satellite map, then click corner points around the boundary.</p>
+          <FieldMap boundary={autoResult?.boundary||[]} onBoundaryChange={setBdry} height={380}/>
+          {boundary?.length>=3&&<p style={{margin:"8px 0 0",fontSize:"12px",color:T.green}}>✓ {boundary.length} points captured</p>}
+        </div>
+      )}
+
+      {err&&<p style={{color:"#E05050",fontSize:"13px",margin:"0 0 10px"}}>{err}</p>}
       <div style={{display:"flex",gap:"8px",justifyContent:"flex-end"}}>
         <button style={mkBtn("ghost")} onClick={onBack}>Cancel</button>
-        <button style={mkBtn("primary")} onClick={()=>{if(!name.trim()){setErr("Field name required.");return;}onSave({id:genId(),name:name.trim(),acres,legalDesc:legal,boundary:boundary||[]});}}>Create Field</button>
+        <button style={mkBtn("primary")} onClick={handleSave}
+          disabled={mode==="quick"?!name.trim()||!autoResult&&!boundary?.length>=3:!name.trim()}>
+          Create Field
+        </button>
       </div>
     </div>
   );
