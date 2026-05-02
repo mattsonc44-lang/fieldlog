@@ -877,7 +877,7 @@ function AddActivityModal({field,onClose,onSave}){
 
 // ── Field Detail ──────────────────────────────────────────────────────
 
-function FieldDetailView({field,activities,onBack,onAddActivity,onDeleteActivity,onUpdateField,onDeleteField}){
+function FieldDetailView({field,activities,onBack,onAddActivity,onDeleteActivity,onUpdateField,onDeleteField,onReport}){
   const[tab,setTab]         =useState("activities"); // "activities"|"map"
   const[editName,setEditName]=useState(false);
   const[nameVal,setNameVal] =useState(field.name);
@@ -906,6 +906,7 @@ function FieldDetailView({field,activities,onBack,onAddActivity,onDeleteActivity
           ?<><h2 style={{fontFamily:"'Playfair Display',serif",fontSize:"22px",margin:0,flex:1}}>{field.name}</h2>{field.acres&&<span style={{color:T.muted,fontSize:"14px"}}>{field.acres} ac</span>}<button style={{...mkBtn("ghost"),padding:"5px 10px",fontSize:"12px"}} onClick={()=>setEditName(true)}>✏️ Edit</button></>
           :<div style={{display:"flex",gap:"8px",flex:1,alignItems:"center",flexWrap:"wrap"}}><input style={{...S.input,flex:"2 1 160px"}} value={nameVal} onChange={e=>setNameVal(e.target.value)}/><input style={{...S.input,flex:"1 1 80px",width:"auto"}} type="number" placeholder="Acres" value={acresVal} onChange={e=>setAcresVal(e.target.value)}/><button style={{...mkBtn("primary"),padding:"6px 12px",fontSize:"12px"}} onClick={()=>{onUpdateField(field.id,{name:nameVal,acres:acresVal});setEditName(false);}}>Save</button><button style={{...mkBtn("ghost"),padding:"6px 12px",fontSize:"12px"}} onClick={()=>setEditName(false)}>Cancel</button></div>
         }
+        <button style={{...mkBtn("ghost"),padding:"6px 12px",fontSize:"13px"}} onClick={onReport}>📊 Report</button>
         <button style={mkBtn("primary")} onClick={onAddActivity}>+ Log Activity</button>
         <button style={{...mkBtn("danger"),padding:"6px 12px",fontSize:"12px"}} onClick={()=>setConfirmDelete(true)}>🗑 Delete</button>
       </div>
@@ -1362,24 +1363,27 @@ Reply ONLY with valid JSON, no markdown fences:
 }
 
 // ── Reports View ──────────────────────────────────────────────────────
-function ReportsView({fields,activities,onBack}){
-  const[type,setType]=useState("spraying");
-  const[sortBy,setSortBy]=useState("date");   // "date" | "field"
+function ReportsView({fields,activities,onBack,filterFieldId=null}){
+  const[type,setType]=useState("all");          // "all" or specific type
+  const[sortBy,setSortBy]=useState("date");
   const[dateFrom,setDateFrom]=useState("");
   const[dateTo,setDateTo]=useState("");
 
+  const isFieldReport = !!filterFieldId;
+  const filterField   = isFieldReport ? fields.find(f=>f.id===filterFieldId) : null;
   const fieldName=(id)=>fields.find(f=>f.id===id)?.name||"Unknown Field";
 
   // Filter and sort
   const results=activities
-    .filter(a=>a.type===type)
+    .filter(a=>!filterFieldId||a.fieldId===filterFieldId)
+    .filter(a=>type==="all"||a.type===type)
     .filter(a=>!dateFrom||a.date>=dateFrom)
     .filter(a=>!dateTo  ||a.date<=dateTo+"T23:59")
     .sort((a,b)=>sortBy==="field"
       ? fieldName(a.fieldId).localeCompare(fieldName(b.fieldId)) || new Date(b.date)-new Date(a.date)
       : new Date(b.date)-new Date(a.date));
 
-  const meta=ACTIVITY_META[type]||ACTIVITY_META.other;
+  const meta = type==="all" ? {label:"All Activities",icon:"📋",color:T.gold} : (ACTIVITY_META[type]||ACTIVITY_META.other);
 
   const print=()=>{
     const style=document.createElement("style");
@@ -1482,18 +1486,30 @@ function ReportsView({fields,activities,onBack}){
     <div>
       {/* Header */}
       <div style={{display:"flex",alignItems:"center",gap:"10px",marginBottom:"20px",flexWrap:"wrap"}} className="no-print">
-        <button style={{...mkBtn("ghost"),padding:"6px 12px"}} onClick={onBack}>← Home</button>
-        <h2 style={{fontFamily:"'Playfair Display',serif",fontSize:"22px",margin:0,flex:1}}>Reports</h2>
+        <button style={{...mkBtn("ghost"),padding:"6px 12px"}} onClick={onBack}>{isFieldReport?"← Field":"← Home"}</button>
+        <h2 style={{fontFamily:"'Playfair Display',serif",fontSize:"22px",margin:0,flex:1}}>
+          {isFieldReport ? `${filterField?.name||"Field"} — Report` : "Reports"}
+        </h2>
         <button style={{...mkBtn("ghost"),padding:"7px 14px",fontSize:"13px"}} onClick={print}>🖨 Print</button>
       </div>
 
       {/* Filters */}
       <div style={{...S.card,marginBottom:"16px"}} className="no-print">
         <div style={{display:"flex",gap:"10px",flexWrap:"wrap",alignItems:"flex-end"}}>
-          {/* Activity type */}
+          {/* Activity type — includes "All" option */}
           <div style={{flex:"1 1 300px"}}>
             <label style={S.label}>Activity Type</label>
             <div style={{display:"flex",gap:"6px",flexWrap:"wrap"}}>
+              {/* All Activities button */}
+              <button style={{
+                ...mkBtn("ghost"),padding:"6px 12px",fontSize:"12px",
+                background:type==="all"?T.gold:"transparent",
+                color:type==="all"?"#FFFFFF":T.muted,
+                border:`1px solid ${type==="all"?T.gold:T.border}`,
+                borderRadius:"6px",
+              }} onClick={()=>setType("all")}>
+                📋 All
+              </button>
               {Object.entries(ACTIVITY_META).map(([k,m])=>(
                 <button key={k} style={{
                   ...mkBtn("ghost"),padding:"6px 12px",fontSize:"12px",
@@ -1519,20 +1535,20 @@ function ReportsView({fields,activities,onBack}){
             </div>
             {(dateFrom||dateTo)&&<button style={{...mkBtn("ghost"),padding:"6px 10px",fontSize:"12px"}} onClick={()=>{setDateFrom("");setDateTo("");}}>Clear</button>}
           </div>
-          {/* Sort */}
-          <div>
+          {/* Sort — only show Field sort when not already filtered to one field */}
+          {!isFieldReport&&<div>
             <label style={S.label}>Sort By</label>
             <div style={{display:"flex",gap:"4px"}}>
               <button style={{...mkBtn("ghost"),padding:"5px 12px",fontSize:"12px",background:sortBy==="date"?T.gold:"transparent",color:sortBy==="date"?"#FFFFFF":T.muted,border:`1px solid ${sortBy==="date"?T.gold:T.border}`}} onClick={()=>setSortBy("date")}>Date</button>
               <button style={{...mkBtn("ghost"),padding:"5px 12px",fontSize:"12px",background:sortBy==="field"?T.gold:"transparent",color:sortBy==="field"?"#FFFFFF":T.muted,border:`1px solid ${sortBy==="field"?T.gold:T.border}`}} onClick={()=>setSortBy("field")}>Field</button>
             </div>
-          </div>
+          </div>}
         </div>
       </div>
 
       {/* Print header (only shows when printing) */}
       <div style={{display:"none"}} className="print-header">
-        <h1 style={{fontFamily:"'Playfair Display',serif",marginBottom:"4px"}}>{meta.icon} {meta.label} Report</h1>
+        <h1 style={{fontFamily:"'Playfair Display',serif",marginBottom:"4px"}}>{meta.icon} {meta.label} Report{isFieldReport?` — ${filterField?.name}`:""}</h1>
         <p style={{color:T.muted,fontSize:"13px",marginBottom:"16px"}}>Generated {new Date().toLocaleDateString("en-US",{year:"numeric",month:"long",day:"numeric"})} · {results.length} record{results.length!==1?"s":""}</p>
       </div>
 
@@ -1542,7 +1558,7 @@ function ReportsView({fields,activities,onBack}){
           <span style={{fontFamily:"'Playfair Display',serif",fontSize:"18px",color:meta.color}}>{meta.icon} {meta.label}</span>
           <span style={{background:meta.color,color:"#fff",borderRadius:"12px",padding:"2px 10px",fontSize:"12px",fontWeight:700}}>{results.length} record{results.length!==1?"s":""}</span>
         </div>
-        {results.length>0&&sortBy==="field"&&<span style={{fontSize:"12px",color:T.muted}}>{[...new Set(results.map(a=>a.fieldId))].length} field{[...new Set(results.map(a=>a.fieldId))].length!==1?"s":""}</span>}
+        {results.length>0&&!isFieldReport&&sortBy==="field"&&<span style={{fontSize:"12px",color:T.muted}}>{[...new Set(results.map(a=>a.fieldId))].length} field{[...new Set(results.map(a=>a.fieldId))].length!==1?"s":""}</span>}
       </div>
 
       {/* Results */}
@@ -1552,37 +1568,45 @@ function ReportsView({fields,activities,onBack}){
         </div>
       )}
 
-      {sortBy==="field"
-        ? // Grouped by field
-          [...new Set(results.map(a=>a.fieldId))].map(fid=>{
+      {/* Field-grouped view (only when not already on a single field) */}
+      {!isFieldReport&&sortBy==="field"
+        ? [...new Set(results.map(a=>a.fieldId))].map(fid=>{
             const fName=fieldName(fid);
             const fResults=results.filter(a=>a.fieldId===fid);
             return(
               <div key={fid} style={{marginBottom:"20px"}}>
                 <h3 style={{fontFamily:"'Playfair Display',serif",fontSize:"15px",color:T.text,margin:"0 0 8px",paddingBottom:"6px",borderBottom:`2px solid ${meta.color}`}}>
-                  🌾 {fName} <span style={{color:T.muted,fontSize:"12px",fontWeight:400}}>— {fResults.length} application{fResults.length!==1?"s":""}</span>
+                  🌾 {fName} <span style={{color:T.muted,fontSize:"12px",fontWeight:400}}>— {fResults.length} record{fResults.length!==1?"s":""}</span>
                 </h3>
-                {fResults.map(a=>(
-                  <div key={a.id} style={{...S.card,borderLeft:`3px solid ${meta.color}`,padding:"12px 14px",marginBottom:"8px"}} className="print-card">
-                    <div style={{display:"flex",alignItems:"center",gap:"8px",marginBottom:"8px"}}>
-                      <span style={{fontWeight:700,fontSize:"13px",color:meta.color}}>{fmtDate(a.date)}</span>
+                {fResults.map(a=>{const am=ACTIVITY_META[a.type]||ACTIVITY_META.other; return(
+                  <div key={a.id} style={{...S.card,borderLeft:`3px solid ${am.color}`,padding:"12px 14px",marginBottom:"8px"}} className="print-card">
+                    <div style={{display:"flex",alignItems:"center",gap:"8px",marginBottom:"8px",flexWrap:"wrap"}}>
+                      <span style={{fontSize:"14px"}}>{am.icon}</span>
+                      <span style={{fontWeight:700,fontSize:"13px",color:am.color}}>{am.label}</span>
+                      <span style={{color:T.faint}}>·</span>
+                      <span style={{fontSize:"13px",color:T.muted}}>{fmtDate(a.date)}</span>
                     </div>
                     {a.type==="scouting"?renderScoutDetail(a.data||{}):renderDetail(a)}
                     {a.notes&&<p style={{margin:"8px 0 0",fontSize:"12px",color:T.muted,fontStyle:"italic"}}>📝 {a.notes}</p>}
                   </div>
-                ))}
+                );})}
               </div>
             );
           })
-        : // Sorted by date
-          results.map(a=>(
-            <div key={a.id} style={{...S.card,borderLeft:`3px solid ${meta.color}`,padding:"12px 14px",marginBottom:"8px"}} className="print-card">
-              <div style={{display:"flex",alignItems:"center",gap:"10px",marginBottom:"8px",flexWrap:"wrap"}}>
-                <span style={{fontWeight:700,fontSize:"14px",color:T.text}}>🌾 {fieldName(a.fieldId)}</span>
-                <span style={{color:T.faint}}>·</span>
-                <span style={{fontSize:"13px",color:meta.color,fontWeight:600}}>{fmtDate(a.date)}</span>
-              </div>
-              {a.type==="scouting"?renderScoutDetail(a.data||{}):renderDetail(a)}
+        : // Date-sorted list (default, and always used for single-field reports)
+          results.map(a=>{
+            const am = type==="all" ? (ACTIVITY_META[a.type]||ACTIVITY_META.other) : meta;
+            return(
+              <div key={a.id} style={{...S.card,borderLeft:`3px solid ${am.color}`,padding:"12px 14px",marginBottom:"8px"}} className="print-card">
+                <div style={{display:"flex",alignItems:"center",gap:"10px",marginBottom:"8px",flexWrap:"wrap"}}>
+                  {!isFieldReport&&<span style={{fontWeight:700,fontSize:"14px",color:T.text}}>🌾 {fieldName(a.fieldId)}</span>}
+                  {!isFieldReport&&<span style={{color:T.faint}}>·</span>}
+                  <span style={{fontSize:"14px"}}>{am.icon}</span>
+                  <span style={{fontWeight:700,fontSize:"13px",color:am.color}}>{am.label}</span>
+                  <span style={{color:T.faint}}>·</span>
+                  <span style={{fontSize:"13px",color:T.muted}}>{fmtDate(a.date)}</span>
+                </div>
+                {a.type==="scouting"?renderScoutDetail(a.data||{}):renderDetail(a)}
               {a.notes&&<p style={{margin:"8px 0 0",fontSize:"12px",color:T.muted,fontStyle:"italic"}}>📝 {a.notes}</p>}
             </div>
           ))
@@ -1646,7 +1670,8 @@ export default function App(){
   const[activities,setActs]=useState([]);
   const[loading,setLoading]=useState(true);
   const[sync,setSync]      =useState("idle"); // "idle"|"saving"|"saved"|"error"|"offline"
-  const[activeField,setAF] =useState(null);
+  const[activeField,setAF]       =useState(null);
+  const[reportFieldId,setRFId]   =useState(null);
   const[showAdd,setShowAdd] =useState(false);
   const[showImport,setShowImport]=useState(false);
   const skipSSE=useRef(false);  // prevent SSE echo after our own write
@@ -1769,10 +1794,10 @@ export default function App(){
       )}
 
       <div style={S.content}>
-        {view==="home"        &&<HomeView fields={fields} activities={activities} onSelect={f=>{setAF(f);setView("fieldDetail");}} onAdd={()=>setView("addField")} onImport={()=>setShowImport(true)} onReport={()=>setView("reports")}/>}
-        {view==="reports"     &&<ReportsView fields={fields} activities={activities} onBack={()=>setView("home")}/>}
+        {view==="home"        &&<HomeView fields={fields} activities={activities} onSelect={f=>{setAF(f);setView("fieldDetail");}} onAdd={()=>setView("addField")} onImport={()=>setShowImport(true)} onReport={()=>{setRFId(null);setView("reports");}}/>}
+        {view==="reports"     &&<ReportsView fields={fields} activities={activities} onBack={()=>setView(reportFieldId?"fieldDetail":"home")} filterFieldId={reportFieldId}/>}
         {view==="addField"    &&<AddFieldView onBack={()=>setView("home")} onSave={addField}/>}
-        {view==="fieldDetail" &&curField&&<FieldDetailView field={curField} activities={activities} onBack={()=>setView("home")} onAddActivity={()=>setShowAdd(true)} onDeleteActivity={delActivity} onUpdateField={updateField} onDeleteField={deleteField}/>}
+        {view==="fieldDetail" &&curField&&<FieldDetailView field={curField} activities={activities} onBack={()=>setView("home")} onAddActivity={()=>setShowAdd(true)} onDeleteActivity={delActivity} onUpdateField={updateField} onDeleteField={deleteField} onReport={()=>{setRFId(curField.id);setView("reports");}}/>}
       </div>
 
       {showAdd&&curField&&<AddActivityModal field={curField} onClose={()=>setShowAdd(false)} onSave={addActivity}/>}
