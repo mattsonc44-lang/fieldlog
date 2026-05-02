@@ -1364,18 +1364,21 @@ Reply ONLY with valid JSON, no markdown fences:
 
 // ── Reports View ──────────────────────────────────────────────────────
 function ReportsView({fields,activities,onBack,filterFieldId=null}){
-  const[type,setType]=useState("all");          // "all" or specific type
-  const[sortBy,setSortBy]=useState("date");
-  const[dateFrom,setDateFrom]=useState("");
-  const[dateTo,setDateTo]=useState("");
+  const[type,setType]         =useState("all");
+  const[fieldFilter,setFField]=useState(filterFieldId||"all"); // "all" or a field id
+  const[sortBy,setSortBy]     =useState("field");  // "field" | "date"
+  const[dateFrom,setDateFrom] =useState("");
+  const[dateTo,setDateTo]     =useState("");
 
   const isFieldReport = !!filterFieldId;
   const filterField   = isFieldReport ? fields.find(f=>f.id===filterFieldId) : null;
   const fieldName=(id)=>fields.find(f=>f.id===id)?.name||"Unknown Field";
 
+  const activeFieldId = isFieldReport ? filterFieldId : (fieldFilter==="all"?null:fieldFilter);
+
   // Filter and sort
   const results=activities
-    .filter(a=>!filterFieldId||a.fieldId===filterFieldId)
+    .filter(a=>!activeFieldId||a.fieldId===activeFieldId)
     .filter(a=>type==="all"||a.type===type)
     .filter(a=>!dateFrom||a.date>=dateFrom)
     .filter(a=>!dateTo  ||a.date<=dateTo+"T23:59")
@@ -1383,7 +1386,15 @@ function ReportsView({fields,activities,onBack,filterFieldId=null}){
       ? fieldName(a.fieldId).localeCompare(fieldName(b.fieldId)) || new Date(b.date)-new Date(a.date)
       : new Date(b.date)-new Date(a.date));
 
-  const meta = type==="all" ? {label:"All Activities",icon:"📋",color:T.gold} : (ACTIVITY_META[type]||ACTIVITY_META.other);
+  const meta = type==="all"
+    ? {label:"All Activities",icon:"📋",color:T.gold}
+    : (ACTIVITY_META[type]||ACTIVITY_META.other);
+
+  // When grouping by field, group results then sort activities within each field by date
+  const groupedByField = [...new Set(results.map(a=>a.fieldId))].map(fid=>({
+    fid, name:fieldName(fid),
+    acts:results.filter(a=>a.fieldId===fid),
+  })).sort((a,b)=>a.name.localeCompare(b.name));
 
   const print=()=>{
     const style=document.createElement("style");
@@ -1495,36 +1506,54 @@ function ReportsView({fields,activities,onBack,filterFieldId=null}){
 
       {/* Filters */}
       <div style={{...S.card,marginBottom:"16px"}} className="no-print">
-        <div style={{display:"flex",gap:"10px",flexWrap:"wrap",alignItems:"flex-end"}}>
-          {/* Activity type — includes "All" option */}
-          <div style={{flex:"1 1 300px"}}>
-            <label style={S.label}>Activity Type</label>
+
+        {/* Row 1: Field selector (only on main reports, not field-specific) */}
+        {!isFieldReport&&(
+          <div style={{...S.row}}>
+            <label style={S.label}>Field</label>
             <div style={{display:"flex",gap:"6px",flexWrap:"wrap"}}>
-              {/* All Activities button */}
               <button style={{
-                ...mkBtn("ghost"),padding:"6px 12px",fontSize:"12px",
-                background:type==="all"?T.gold:"transparent",
-                color:type==="all"?"#FFFFFF":T.muted,
-                border:`1px solid ${type==="all"?T.gold:T.border}`,
-                borderRadius:"6px",
-              }} onClick={()=>setType("all")}>
-                📋 All
-              </button>
-              {Object.entries(ACTIVITY_META).map(([k,m])=>(
-                <button key={k} style={{
-                  ...mkBtn("ghost"),padding:"6px 12px",fontSize:"12px",
-                  background:type===k?m.color:"transparent",
-                  color:type===k?"#FFFFFF":T.muted,
-                  border:`1px solid ${type===k?m.color:T.border}`,
-                  borderRadius:"6px",
-                }} onClick={()=>setType(k)}>
-                  {m.icon} {m.label}
-                </button>
+                ...mkBtn("ghost"),padding:"6px 14px",fontSize:"12px",
+                background:fieldFilter==="all"?T.gold:"transparent",
+                color:fieldFilter==="all"?"#FFFFFF":T.muted,
+                border:`1px solid ${fieldFilter==="all"?T.gold:T.border}`,
+              }} onClick={()=>setFField("all")}>🌾 All Fields</button>
+              {[...fields].sort((a,b)=>a.name.localeCompare(b.name)).map(f=>(
+                <button key={f.id} style={{
+                  ...mkBtn("ghost"),padding:"6px 14px",fontSize:"12px",
+                  background:fieldFilter===f.id?"#2A5A8A":"transparent",
+                  color:fieldFilter===f.id?"#FFFFFF":T.muted,
+                  border:`1px solid ${fieldFilter===f.id?"#2A5A8A":T.border}`,
+                }} onClick={()=>setFField(f.id)}>{f.name}{f.acres?` (${f.acres}ac)`:""}</button>
               ))}
             </div>
           </div>
-          {/* Date range */}
-          <div style={{display:"flex",gap:"8px",alignItems:"flex-end",flexWrap:"wrap"}}>
+        )}
+
+        {/* Row 2: Activity type */}
+        <div style={{...S.row,marginBottom:"10px"}}>
+          <label style={S.label}>Activity Type</label>
+          <div style={{display:"flex",gap:"6px",flexWrap:"wrap"}}>
+            <button style={{
+              ...mkBtn("ghost"),padding:"6px 12px",fontSize:"12px",
+              background:type==="all"?T.gold:"transparent",
+              color:type==="all"?"#FFFFFF":T.muted,
+              border:`1px solid ${type==="all"?T.gold:T.border}`,
+            }} onClick={()=>setType("all")}>📋 All</button>
+            {Object.entries(ACTIVITY_META).map(([k,m])=>(
+              <button key={k} style={{
+                ...mkBtn("ghost"),padding:"6px 12px",fontSize:"12px",
+                background:type===k?m.color:"transparent",
+                color:type===k?"#FFFFFF":T.muted,
+                border:`1px solid ${type===k?m.color:T.border}`,
+              }} onClick={()=>setType(k)}>{m.icon} {m.label}</button>
+            ))}
+          </div>
+        </div>
+
+        {/* Row 3: Date range + Group by */}
+        <div style={{display:"flex",gap:"10px",flexWrap:"wrap",alignItems:"flex-end"}}>
+          <div style={{display:"flex",gap:"8px",alignItems:"flex-end",flexWrap:"wrap",flex:1}}>
             <div>
               <label style={S.label}>From</label>
               <input style={{...S.input,width:"140px"}} type="date" value={dateFrom} onChange={e=>setDateFrom(e.target.value)}/>
@@ -1535,14 +1564,15 @@ function ReportsView({fields,activities,onBack,filterFieldId=null}){
             </div>
             {(dateFrom||dateTo)&&<button style={{...mkBtn("ghost"),padding:"6px 10px",fontSize:"12px"}} onClick={()=>{setDateFrom("");setDateTo("");}}>Clear</button>}
           </div>
-          {/* Sort — only show Field sort when not already filtered to one field */}
-          {!isFieldReport&&<div>
-            <label style={S.label}>Sort By</label>
-            <div style={{display:"flex",gap:"4px"}}>
-              <button style={{...mkBtn("ghost"),padding:"5px 12px",fontSize:"12px",background:sortBy==="date"?T.gold:"transparent",color:sortBy==="date"?"#FFFFFF":T.muted,border:`1px solid ${sortBy==="date"?T.gold:T.border}`}} onClick={()=>setSortBy("date")}>Date</button>
-              <button style={{...mkBtn("ghost"),padding:"5px 12px",fontSize:"12px",background:sortBy==="field"?T.gold:"transparent",color:sortBy==="field"?"#FFFFFF":T.muted,border:`1px solid ${sortBy==="field"?T.gold:T.border}`}} onClick={()=>setSortBy("field")}>Field</button>
+          {!isFieldReport&&(
+            <div>
+              <label style={S.label}>Group By</label>
+              <div style={{display:"flex",gap:"4px"}}>
+                <button style={{...mkBtn("ghost"),padding:"5px 12px",fontSize:"12px",background:sortBy==="field"?T.gold:"transparent",color:sortBy==="field"?"#FFFFFF":T.muted,border:`1px solid ${sortBy==="field"?T.gold:T.border}`}} onClick={()=>setSortBy("field")}>Field</button>
+                <button style={{...mkBtn("ghost"),padding:"5px 12px",fontSize:"12px",background:sortBy==="date"?T.gold:"transparent",color:sortBy==="date"?"#FFFFFF":T.muted,border:`1px solid ${sortBy==="date"?T.gold:T.border}`}} onClick={()=>setSortBy("date")}>Date</button>
+              </div>
             </div>
-          </div>}
+          )}
         </div>
       </div>
 
@@ -1568,43 +1598,46 @@ function ReportsView({fields,activities,onBack,filterFieldId=null}){
         </div>
       )}
 
-      {/* Field-grouped view (only when not already on a single field) */}
-      {!isFieldReport&&sortBy==="field"
-        ? [...new Set(results.map(a=>a.fieldId))].map(fid=>{
-            const fName=fieldName(fid);
-            const fResults=results.filter(a=>a.fieldId===fid);
-            return(
-              <div key={fid} style={{marginBottom:"20px"}}>
-                <h3 style={{fontFamily:"'Playfair Display',serif",fontSize:"15px",color:T.text,margin:"0 0 8px",paddingBottom:"6px",borderBottom:`2px solid ${meta.color}`}}>
-                  🌾 {fName} <span style={{color:T.muted,fontSize:"12px",fontWeight:400}}>— {fResults.length} record{fResults.length!==1?"s":""}</span>
-                </h3>
-                {fResults.map(a=>{const am=ACTIVITY_META[a.type]||ACTIVITY_META.other; return(
-                  <div key={a.id} style={{...S.card,borderLeft:`3px solid ${am.color}`,padding:"12px 14px",marginBottom:"8px"}} className="print-card">
-                    <div style={{display:"flex",alignItems:"center",gap:"8px",marginBottom:"8px",flexWrap:"wrap"}}>
-                      <span style={{fontSize:"14px"}}>{am.icon}</span>
-                      <span style={{fontWeight:700,fontSize:"13px",color:am.color}}>{am.label}</span>
-                      <span style={{color:T.faint}}>·</span>
-                      <span style={{fontSize:"13px",color:T.muted}}>{fmtDate(a.date)}</span>
-                    </div>
-                    {a.type==="scouting"?renderScoutDetail(a.data||{}):renderDetail(a)}
-                    {a.notes&&<p style={{margin:"8px 0 0",fontSize:"12px",color:T.muted,fontStyle:"italic"}}>📝 {a.notes}</p>}
+      {/* Field-grouped view */}
+      {(!isFieldReport&&sortBy==="field")
+        ? groupedByField.map(({fid,name:fName,acts:fResults})=>(
+            <div key={fid} style={{marginBottom:"24px"}}>
+              <h3 style={{fontFamily:"'Playfair Display',serif",fontSize:"16px",color:T.text,margin:"0 0 10px",paddingBottom:"8px",borderBottom:`2px solid ${T.borderHi}`,display:"flex",alignItems:"center",gap:"10px"}}>
+                <span>🌾 {fName}</span>
+                <span style={{fontSize:"12px",color:T.muted,fontWeight:400}}>{fResults.length} record{fResults.length!==1?"s":""}</span>
+                {/* mini type breakdown */}
+                <span style={{marginLeft:"auto",display:"flex",gap:"4px",flexWrap:"wrap"}}>
+                  {Object.entries(ACTIVITY_META).filter(([k])=>fResults.some(a=>a.type===k)).map(([k,m])=>(
+                    <span key={k} style={{fontSize:"10px",padding:"1px 6px",borderRadius:"8px",background:m.color+"20",border:`1px solid ${m.color}40`,color:m.color}}>{m.icon} {fResults.filter(a=>a.type===k).length}</span>
+                  ))}
+                </span>
+              </h3>
+              {fResults.map(a=>{const am=ACTIVITY_META[a.type]||ACTIVITY_META.other; return(
+                <div key={a.id} style={{...S.card,borderLeft:`3px solid ${am.color}`,padding:"12px 14px",marginBottom:"8px"}} className="print-card">
+                  <div style={{display:"flex",alignItems:"center",gap:"8px",marginBottom:"8px",flexWrap:"wrap"}}>
+                    <span style={{fontSize:"15px"}}>{am.icon}</span>
+                    <span style={{fontWeight:700,fontSize:"13px",color:am.color}}>{am.label}</span>
+                    <span style={{color:T.faint}}>·</span>
+                    <span style={{fontSize:"12px",color:T.muted}}>{fmtDate(a.date)}</span>
                   </div>
-                );})}
-              </div>
-            );
-          })
-        : // Date-sorted list (default, and always used for single-field reports)
+                  {a.type==="scouting"?renderScoutDetail(a.data||{}):renderDetail(a)}
+                  {a.notes&&<p style={{margin:"8px 0 0",fontSize:"12px",color:T.muted,fontStyle:"italic"}}>📝 {a.notes}</p>}
+                </div>
+              );})}
+            </div>
+          ))
+        : // Date-sorted list
           results.map(a=>{
             const am = type==="all" ? (ACTIVITY_META[a.type]||ACTIVITY_META.other) : meta;
             return(
               <div key={a.id} style={{...S.card,borderLeft:`3px solid ${am.color}`,padding:"12px 14px",marginBottom:"8px"}} className="print-card">
                 <div style={{display:"flex",alignItems:"center",gap:"10px",marginBottom:"8px",flexWrap:"wrap"}}>
-                  {!isFieldReport&&<span style={{fontWeight:700,fontSize:"14px",color:T.text}}>🌾 {fieldName(a.fieldId)}</span>}
-                  {!isFieldReport&&<span style={{color:T.faint}}>·</span>}
-                  <span style={{fontSize:"14px"}}>{am.icon}</span>
+                  {!activeFieldId&&<span style={{fontWeight:700,fontSize:"14px",color:T.text}}>🌾 {fieldName(a.fieldId)}</span>}
+                  {!activeFieldId&&<span style={{color:T.faint}}>·</span>}
+                  <span style={{fontSize:"15px"}}>{am.icon}</span>
                   <span style={{fontWeight:700,fontSize:"13px",color:am.color}}>{am.label}</span>
                   <span style={{color:T.faint}}>·</span>
-                  <span style={{fontSize:"13px",color:T.muted}}>{fmtDate(a.date)}</span>
+                  <span style={{fontSize:"12px",color:T.muted}}>{fmtDate(a.date)}</span>
                 </div>
                 {a.type==="scouting"?renderScoutDetail(a.data||{}):renderDetail(a)}
               {a.notes&&<p style={{margin:"8px 0 0",fontSize:"12px",color:T.muted,fontStyle:"italic"}}>📝 {a.notes}</p>}
