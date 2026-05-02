@@ -1640,9 +1640,9 @@ function ReportsView({fields,activities,onBack,filterFieldId=null}){
                   <span style={{fontSize:"12px",color:T.muted}}>{fmtDate(a.date)}</span>
                 </div>
                 {a.type==="scouting"?renderScoutDetail(a.data||{}):renderDetail(a)}
-              {a.notes&&<p style={{margin:"8px 0 0",fontSize:"12px",color:T.muted,fontStyle:"italic"}}>📝 {a.notes}</p>}
-            </div>
-          ))
+                {a.notes&&<p style={{margin:"8px 0 0",fontSize:"12px",color:T.muted,fontStyle:"italic"}}>📝 {a.notes}</p>}
+              </div>
+            );})
       }
     </div>
   );
