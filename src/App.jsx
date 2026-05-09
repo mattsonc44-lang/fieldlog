@@ -163,7 +163,7 @@ const mkBtn=(v="primary")=>({
 // ╔═══════════════════════════════════════════════════════════╗
 // ║  TILE MAP — <img> tiles + <svg> overlay                  ║
 // ╚═══════════════════════════════════════════════════════════╝
-function FieldMap({boundary=[],onBoundaryChange,height=350}){
+function FieldMap({boundary=[],onBoundaryChange,height=350,readOnly=false}){
   const wrapRef=useRef(null);
   const dragRef=useRef({on:false,sx:0,sy:0,sc:[0,0],moved:false});
   const touchR =useRef({x:0,y:0,sc:[0,0],moved:false});
@@ -178,7 +178,8 @@ function FieldMap({boundary=[],onBoundaryChange,height=350}){
     if(boundary&&boundary.length>1){
       const lats=boundary.map(p=>p[0]),lngs=boundary.map(p=>p[1]);
       const span=Math.max(Math.max(...lats)-Math.min(...lats),Math.max(...lngs)-Math.min(...lngs));
-      return Math.min(17,Math.max(12,Math.round(Math.log2(0.08/span)+14)));
+      // Zoom out 1 extra level for context
+      return Math.min(16,Math.max(11,Math.round(Math.log2(0.08/span)+13)));
     }
     return 14;
   });
@@ -220,7 +221,7 @@ function FieldMap({boundary=[],onBoundaryChange,height=350}){
   };
   const onMU=()=>{dragRef.current.on=false;};
   const onClick=(e)=>{
-    if(dragRef.current.moved) return;
+    if(readOnly||dragRef.current.moved) return;
     const[x,y]=evXY(e); setPts(p=>[...p,px2ll(x,y)]);
   };
   const onWheel=(e)=>{e.preventDefault();setZoom(z=>Math.max(8,Math.min(18,z+(e.deltaY<0?1:-1))));};
@@ -232,7 +233,7 @@ function FieldMap({boundary=[],onBoundaryChange,height=350}){
     if(touchR.current.moved) pan(dx,dy,touchR.current.sc);
   };
   const onTE=(e)=>{
-    if(touchR.current.moved||e.changedTouches.length!==1) return;
+    if(readOnly||touchR.current.moved||e.changedTouches.length!==1) return;
     const r=wrapRef.current.getBoundingClientRect();
     setPts(p=>[...p,px2ll(e.changedTouches[0].clientX-r.left,e.changedTouches[0].clientY-r.top)]);
   };
@@ -249,13 +250,17 @@ function FieldMap({boundary=[],onBoundaryChange,height=350}){
   return(
     <div>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"5px"}}>
-        <span style={{fontSize:"11px",color:T.muted}}>Drag to pan · Scroll to zoom · <strong style={{color:T.goldSoft}}>Click map to place corners</strong></span>
+        <span style={{fontSize:"11px",color:T.muted}}>
+          {readOnly
+            ? "Drag to pan · Scroll to zoom"
+            : <>Drag to pan · Scroll to zoom · <strong style={{color:T.goldSoft}}>Click map to place corners</strong></>}
+        </span>
         <div style={{display:"flex",gap:"3px"}}>
           <button style={{...mkBtn("ghost"),padding:"2px 10px",fontSize:"18px",lineHeight:1}} onClick={()=>setZoom(z=>Math.max(8,z-1))}>−</button>
           <button style={{...mkBtn("ghost"),padding:"2px 10px",fontSize:"18px",lineHeight:1}} onClick={()=>setZoom(z=>Math.min(18,z+1))}>+</button>
         </div>
       </div>
-      <div ref={wrapRef} style={{position:"relative",width:"100%",height:`${H}px`,borderRadius:"8px",overflow:"hidden",border:`1px solid ${T.borderHi}`,background:"#C8C8C0",cursor:"crosshair",userSelect:"none"}}
+      <div ref={wrapRef} style={{position:"relative",width:"100%",height:`${H}px`,borderRadius:"8px",overflow:"hidden",border:`1px solid ${T.borderHi}`,background:"#C8C8C0",cursor:readOnly?"grab":"crosshair",userSelect:"none"}}
         onMouseDown={onMD} onMouseMove={onMM} onMouseUp={onMU} onMouseLeave={onMU}
         onClick={onClick} onWheel={onWheel}
         onTouchStart={onTS} onTouchMove={onTM} onTouchEnd={onTE}>
@@ -268,13 +273,15 @@ function FieldMap({boundary=[],onBoundaryChange,height=350}){
         <div style={{position:"absolute",bottom:0,right:0,background:"rgba(0,0,0,0.55)",color:"#bbb",fontSize:"9px",padding:"2px 6px",pointerEvents:"none"}}>© Esri, DigitalGlobe, GeoEye</div>
         <div style={{position:"absolute",bottom:0,left:0,background:"rgba(0,0,0,0.55)",color:"#bbb",fontSize:"9px",padding:"2px 6px",pointerEvents:"none"}}>z{tz}</div>
       </div>
-      <div style={{display:"flex",alignItems:"center",gap:"8px",marginTop:"8px",flexWrap:"wrap"}}>
-        <span style={{flex:1,fontSize:"12px",color:nPts>=3?T.green:T.muted}}>
-          {nPts<3?`Click to place corners — ${nPts} point${nPts!==1?"s":""} placed`:`✓ ${nPts} points — boundary auto-saved`}
-        </span>
-        <button style={{...mkBtn("ghost"),padding:"5px 11px",fontSize:"12px"}} onClick={undo}  disabled={!nPts}>Undo</button>
-        <button style={{...mkBtn("ghost"),padding:"5px 11px",fontSize:"12px"}} onClick={clear} disabled={!nPts}>Clear</button>
-      </div>
+      {!readOnly&&(
+        <div style={{display:"flex",alignItems:"center",gap:"8px",marginTop:"8px",flexWrap:"wrap"}}>
+          <span style={{flex:1,fontSize:"12px",color:nPts>=3?T.green:T.muted}}>
+            {nPts<3?`Click to place corners — ${nPts} point${nPts!==1?"s":""} placed`:`✓ ${nPts} points — boundary auto-saved`}
+          </span>
+          <button style={{...mkBtn("ghost"),padding:"5px 11px",fontSize:"12px"}} onClick={undo}  disabled={!nPts}>Undo</button>
+          <button style={{...mkBtn("ghost"),padding:"5px 11px",fontSize:"12px"}} onClick={clear} disabled={!nPts}>Clear</button>
+        </div>
+      )}
     </div>
   );
 }
@@ -631,6 +638,99 @@ function ScoutingForm({v,set}){
   );
 }
 
+// ── Harvest Form ──────────────────────────────────────────────────────
+const DELIVERY_LOCATIONS = ["Local Elevator","Co-op","Farm Storage — Bin 1","Farm Storage — Bin 2","Farm Storage — Bin 3","Direct to Buyer","Other"];
+
+function HarvestForm({v,set}){
+  const totalBu = v.yieldPerAc && v.acres
+    ? (parseFloat(v.yieldPerAc)*parseFloat(v.acres)).toFixed(0)
+    : v.totalBushels||"";
+
+  return(
+    <div>
+      {/* Crop + equipment */}
+      <div style={S.g2}>
+        <div style={S.row}>
+          <label style={S.label}>Crop Harvested</label>
+          <select style={S.input} value={v.crop||""} onChange={e=>set({...v,crop:e.target.value})}>
+            <option value="">Select crop…</option>
+            {CROPS.map(c=><option key={c}>{c}</option>)}
+          </select>
+        </div>
+        <div style={S.row}>
+          <label style={S.label}>Combine / Equipment</label>
+          <input style={S.input} type="text" placeholder="e.g. JD S780" value={v.equipment||""} onChange={e=>set({...v,equipment:e.target.value})}/>
+        </div>
+      </div>
+
+      {/* Yield */}
+      <div style={{background:"#F8F6EC",border:`1px solid #E0CFA0`,borderRadius:"8px",padding:"14px",marginBottom:"14px"}}>
+        <p style={{margin:"0 0 12px",fontSize:"11px",color:"#7A6020",textTransform:"uppercase",letterSpacing:"0.9px",fontWeight:700}}>🌾 Yield</p>
+        <div style={S.g2}>
+          <div style={S.row}>
+            <label style={S.label}>Yield (bu / ac)</label>
+            <input style={S.input} type="number" step="0.1" placeholder="e.g. 45" value={v.yieldPerAc||""} onChange={e=>set({...v,yieldPerAc:e.target.value})}/>
+          </div>
+          <div style={S.row}>
+            <label style={S.label}>Total Bushels</label>
+            <input style={S.input} type="number" step="1" placeholder="Auto-calc or enter" value={v.totalBushels||totalBu||""} onChange={e=>set({...v,totalBushels:e.target.value})}/>
+          </div>
+          <div style={S.row}>
+            <label style={S.label}>Moisture (%)</label>
+            <input style={S.input} type="number" step="0.1" placeholder="e.g. 14.5" value={v.moisture||""} onChange={e=>set({...v,moisture:e.target.value})}/>
+          </div>
+          <div style={S.row}>
+            <label style={S.label}>Test Weight (lbs/bu)</label>
+            <input style={S.input} type="number" step="0.1" placeholder="e.g. 60" value={v.testWeight||""} onChange={e=>set({...v,testWeight:e.target.value})}/>
+          </div>
+        </div>
+        <div style={S.g2}>
+          <div style={S.row}>
+            <label style={S.label}>Dockage (%)</label>
+            <input style={S.input} type="number" step="0.1" placeholder="e.g. 2.5" value={v.dockage||""} onChange={e=>set({...v,dockage:e.target.value})}/>
+          </div>
+          <div style={S.row}>
+            <label style={S.label}>Grade</label>
+            <input style={S.input} type="text" placeholder="e.g. 1CW, 2CWRS" value={v.grade||""} onChange={e=>set({...v,grade:e.target.value})}/>
+          </div>
+        </div>
+      </div>
+
+      {/* Delivery */}
+      <div style={{background:"#F0F5F8",border:`1px solid #A8C4D8`,borderRadius:"8px",padding:"14px",marginBottom:"14px"}}>
+        <p style={{margin:"0 0 12px",fontSize:"11px",color:"#2A5070",textTransform:"uppercase",letterSpacing:"0.9px",fontWeight:700}}>🚛 Delivery</p>
+        <div style={S.g2}>
+          <div style={S.row}>
+            <label style={S.label}>Delivered To</label>
+            <select style={S.input} value={v.deliveredTo||""} onChange={e=>set({...v,deliveredTo:e.target.value})}>
+              <option value="">Select location…</option>
+              {DELIVERY_LOCATIONS.map(l=><option key={l}>{l}</option>)}
+            </select>
+            {v.deliveredTo==="Other"&&<input style={{...S.input,marginTop:"6px"}} type="text" placeholder="Location name" value={v.deliveredToCustom||""} onChange={e=>set({...v,deliveredToCustom:e.target.value})}/>}
+          </div>
+          <div style={S.row}>
+            <label style={S.label}>Price ($/bu)</label>
+            <input style={S.input} type="number" step="0.01" placeholder="e.g. 7.25" value={v.price||""} onChange={e=>set({...v,price:e.target.value})}/>
+          </div>
+        </div>
+        {/* Revenue calc */}
+        {v.price&&(v.totalBushels||totalBu)&&(
+          <div style={{background:"#FFFFFF",border:`1px solid #A8C4D8`,borderRadius:"6px",padding:"10px 12px",display:"flex",gap:"20px",flexWrap:"wrap"}}>
+            <div><span style={{fontSize:"11px",color:T.muted}}>Est. Revenue</span><div style={{fontWeight:700,fontSize:"17px",color:T.blue}}>${(parseFloat(v.price)*(parseFloat(v.totalBushels||totalBu))).toLocaleString("en-US",{maximumFractionDigits:0})}</div></div>
+            <div><span style={{fontSize:"11px",color:T.muted}}>@ {v.price}/bu</span><div style={{fontSize:"13px",color:T.muted}}>{Number(v.totalBushels||totalBu).toLocaleString()} bu</div></div>
+          </div>
+        )}
+      </div>
+
+      {/* AgriScale badge — placeholder for live connection */}
+      <div style={{background:"#F5F5F5",border:`1px solid #D0D0D0`,borderRadius:"6px",padding:"10px 12px",fontSize:"12px",color:T.muted,display:"flex",gap:"8px",alignItems:"center"}}>
+        <span style={{fontSize:"16px"}}>⚖️</span>
+        <span>AgriScale live sync coming — loads will auto-populate here when connected.</span>
+      </div>
+    </div>
+  );
+}
+
 // ── Spraying Form ─────────────────────────────────────────────────────
 function SprayingForm({v,set}){
   const mix=v.tankMix||[];
@@ -699,6 +799,9 @@ function ActivityCard({activity,onDelete}){
       if(d.recommendedAction&&d.recommendedAction!=="No action required — monitor") parts.push(d.recommendedAction.split("—")[0].trim());
       return parts.join("  ·  ")||"Scouting observation";
     }
+    if(activity.type==="harvest"){
+      return [d.crop&&`Crop: ${d.crop}`, d.yieldPerAc&&`${d.yieldPerAc} bu/ac`, d.moisture&&`${d.moisture}% moisture`, d.grade&&d.grade, d.deliveredTo&&`→ ${d.deliveredTo}`].filter(Boolean).join("  ·  ");
+    }
     return d.details||"";
   };
   const detail=()=>{
@@ -753,6 +856,21 @@ function ActivityCard({activity,onDelete}){
         {d.purpose&&<div style={{marginBottom:"8px"}}><span style={{color:T.muted}}>Purpose:</span> {d.purpose}</div>}
         {(d.tankMix||[]).length>0&&<><p style={{margin:"0 0 4px",fontSize:"11px",color:T.muted,textTransform:"uppercase",letterSpacing:"0.8px"}}>Tank Mix</p>
           {d.tankMix.map((c,i)=><div key={c.id||i} style={{display:"flex",gap:"12px",padding:"5px 10px",background:T.panel,borderRadius:"4px",marginBottom:"4px"}}><span style={{flex:1}}>{c.chemical==="Other"?(c.chemicalName||"—"):c.chemical}</span><span style={{color:T.gold,fontWeight:700}}>{c.oz} {c.unit}</span></div>)}</>}
+      </div>
+    );
+    if(activity.type==="harvest") return(
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"5px 16px",marginTop:"10px",fontSize:"13px"}}>
+        {d.crop&&<span><span style={{color:T.muted}}>Crop:</span> {d.crop}</span>}
+        {d.yieldPerAc&&<span><span style={{color:T.muted}}>Yield:</span> {d.yieldPerAc} bu/ac</span>}
+        {d.totalBushels&&<span><span style={{color:T.muted}}>Total:</span> {Number(d.totalBushels).toLocaleString()} bu</span>}
+        {d.moisture&&<span><span style={{color:T.muted}}>Moisture:</span> {d.moisture}%</span>}
+        {d.testWeight&&<span><span style={{color:T.muted}}>Test wt:</span> {d.testWeight} lbs/bu</span>}
+        {d.dockage&&<span><span style={{color:T.muted}}>Dockage:</span> {d.dockage}%</span>}
+        {d.grade&&<span><span style={{color:T.muted}}>Grade:</span> {d.grade}</span>}
+        {d.deliveredTo&&<span><span style={{color:T.muted}}>Delivered:</span> {d.deliveredTo==="Other"?d.deliveredToCustom:d.deliveredTo}</span>}
+        {d.price&&<span><span style={{color:T.muted}}>Price:</span> ${d.price}/bu</span>}
+        {d.equipment&&<span><span style={{color:T.muted}}>Equipment:</span> {d.equipment}</span>}
+        {d.price&&d.totalBushels&&<span style={{gridColumn:"span 2",fontWeight:700,color:T.blue}}>Revenue: ${(parseFloat(d.price)*parseFloat(d.totalBushels)).toLocaleString("en-US",{maximumFractionDigits:0})}</span>}
       </div>
     );
     return d.details?<p style={{marginTop:"8px",fontSize:"13px"}}>{d.details}</p>:null;
@@ -863,7 +981,8 @@ function AddActivityModal({field,onClose,onSave}){
         {type==="seeding"  &&<SeedingForm v={data} set={setData}/>}
         {type==="spraying" &&<SprayingForm v={data} set={setData}/>}
         {type==="scouting" &&<ScoutingForm v={data} set={setData}/>}
-        {["rockPicking","tillage","harvest","other"].includes(type)&&<div style={S.row}><label style={S.label}>Details / Equipment</label><input style={S.input} type="text" placeholder="Describe equipment, area, conditions…" value={data.details||""} onChange={e=>setData({...data,details:e.target.value})}/></div>}
+        {type==="harvest"  &&<HarvestForm v={data} set={setData}/>}
+        {["rockPicking","tillage","other"].includes(type)&&<div style={S.row}><label style={S.label}>Details / Equipment</label><input style={S.input} type="text" placeholder="Describe equipment, area, conditions…" value={data.details||""} onChange={e=>setData({...data,details:e.target.value})}/></div>}
         {type&&<div style={S.row}><label style={S.label}>Notes</label><textarea style={{...S.input,height:"60px",resize:"vertical"}} placeholder="Weather, observations…" value={notes} onChange={e=>setNotes(e.target.value)}/></div>}
         {err&&<p style={{color:"#E05050",fontSize:"13px",margin:"0 0 10px"}}>{err}</p>}
         <div style={{display:"flex",gap:"8px",justifyContent:"flex-end"}}>
@@ -884,6 +1003,7 @@ function FieldDetailView({field,activities,onBack,onAddActivity,onDeleteActivity
   const[acresVal,setAcresVal]=useState(field.acres||"");
   const[filter,setFilter]   =useState("all");
   const[confirmDelete,setConfirmDelete]=useState(false);
+  const[editBoundary,setEditBoundary]=useState(false);
 
   const all   = activities.filter(a=>a.fieldId===field.id);
   const shown = all.filter(a=>filter==="all"||a.type===filter).sort((a,b)=>new Date(b.date)-new Date(a.date));
@@ -934,9 +1054,26 @@ function FieldDetailView({field,activities,onBack,onAddActivity,onDeleteActivity
         <div style={S.card}>
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"12px"}}>
             <span style={{fontWeight:700,color:T.gold,fontSize:"13px"}}>📍 Field Boundary</span>
-            <span style={{fontSize:"12px",color:T.muted}}>{field.boundary?.length>=3?`${field.boundary.length} corner points`:"No boundary yet"}</span>
+            <div style={{display:"flex",gap:"8px",alignItems:"center"}}>
+              {field.boundary?.length>=3&&<span style={{fontSize:"12px",color:T.muted}}>{field.boundary.length} points</span>}
+              <button style={{
+                ...mkBtn(editBoundary?"primary":"ghost"),
+                padding:"5px 12px",fontSize:"12px",
+              }} onClick={()=>setEditBoundary(e=>!e)}>
+                {editBoundary?"✓ Done Editing":"✏️ Edit Boundary"}
+              </button>
+            </div>
           </div>
-          <FieldMap key={`${field.id}-map`} boundary={field.boundary||[]} onBoundaryChange={(pts)=>onUpdateField(field.id,{boundary:pts})} height={360}/>
+          {!field.boundary?.length&&!editBoundary&&(
+            <p style={{margin:"0 0 10px",fontSize:"12px",color:T.muted}}>No boundary drawn yet. Click "Edit Boundary" to draw one.</p>
+          )}
+          <FieldMap
+            key={`${field.id}-map-${editBoundary}`}
+            boundary={field.boundary||[]}
+            onBoundaryChange={editBoundary?(pts)=>onUpdateField(field.id,{boundary:pts}):undefined}
+            readOnly={!editBoundary}
+            height={380}
+          />
           {field.legalDesc&&<p style={{margin:"8px 0 0",fontSize:"12px",color:T.muted}}>Legal: {field.legalDesc}</p>}
         </div>
       )}
@@ -1365,21 +1502,25 @@ Reply ONLY with valid JSON, no markdown fences:
 // ── Reports View ──────────────────────────────────────────────────────
 function ReportsView({fields,activities,onBack,filterFieldId=null}){
   const[type,setType]         =useState("all");
-  const[fieldFilter,setFField]=useState(filterFieldId||"all"); // "all" or a field id
-  const[sortBy,setSortBy]     =useState("field");  // "field" | "date"
+  const[fieldFilter,setFField]=useState(filterFieldId||"all");
+  const[sortBy,setSortBy]     =useState("field");
+  const[yearFilter,setYearFilter]=useState("all");
   const[dateFrom,setDateFrom] =useState("");
   const[dateTo,setDateTo]     =useState("");
 
   const isFieldReport = !!filterFieldId;
   const filterField   = isFieldReport ? fields.find(f=>f.id===filterFieldId) : null;
   const fieldName=(id)=>fields.find(f=>f.id===id)?.name||"Unknown Field";
-
   const activeFieldId = isFieldReport ? filterFieldId : (fieldFilter==="all"?null:fieldFilter);
+
+  // Derive available years from activity dates
+  const availableYears = [...new Set(activities.map(a=>a.date?.slice(0,4)).filter(Boolean))].sort((a,b)=>b-a);
 
   // Filter and sort
   const results=activities
     .filter(a=>!activeFieldId||a.fieldId===activeFieldId)
     .filter(a=>type==="all"||a.type===type)
+    .filter(a=>yearFilter==="all"||a.date?.startsWith(yearFilter))
     .filter(a=>!dateFrom||a.date>=dateFrom)
     .filter(a=>!dateTo  ||a.date<=dateTo+"T23:59")
     .sort((a,b)=>sortBy==="field"
@@ -1475,6 +1616,20 @@ function ReportsView({fields,activities,onBack,filterFieldId=null}){
         </div>
       );
     }
+    if(a.type==="harvest"){
+      const d=a.data||{};
+      return(
+        <div style={{display:"flex",gap:"16px",flexWrap:"wrap",fontSize:"13px"}}>
+          {d.crop&&<span><span style={{color:T.muted}}>Crop:</span> {d.crop}</span>}
+          {d.yieldPerAc&&<span><span style={{color:T.muted}}>Yield:</span> {d.yieldPerAc} bu/ac</span>}
+          {d.totalBushels&&<span><span style={{color:T.muted}}>Total:</span> {Number(d.totalBushels).toLocaleString()} bu</span>}
+          {d.moisture&&<span><span style={{color:T.muted}}>Moisture:</span> {d.moisture}%</span>}
+          {d.grade&&<span><span style={{color:T.muted}}>Grade:</span> {d.grade}</span>}
+          {d.deliveredTo&&<span><span style={{color:T.muted}}>Delivered:</span> {d.deliveredTo==="Other"?d.deliveredToCustom:d.deliveredTo}</span>}
+          {d.price&&d.totalBushels&&<span style={{fontWeight:700,color:T.blue}}>Revenue: ${(parseFloat(d.price)*parseFloat(d.totalBushels)).toLocaleString("en-US",{maximumFractionDigits:0})}</span>}
+        </div>
+      );
+    }
     return d.details?<p style={{margin:0,fontSize:"13px"}}>{d.details}</p>:null;
   };
   const renderScoutDetail=(d)=>(
@@ -1551,7 +1706,20 @@ function ReportsView({fields,activities,onBack,filterFieldId=null}){
           </div>
         </div>
 
-        {/* Row 3: Date range + Group by */}
+        {/* Row 3: Year filter */}
+        {availableYears.length>0&&(
+          <div style={{...S.row,marginBottom:"10px"}}>
+            <label style={S.label}>Crop Year</label>
+            <div style={{display:"flex",gap:"6px",flexWrap:"wrap"}}>
+              <button style={{...mkBtn("ghost"),padding:"5px 14px",fontSize:"12px",background:yearFilter==="all"?T.gold:"transparent",color:yearFilter==="all"?"#FFFFFF":T.muted,border:`1px solid ${yearFilter==="all"?T.gold:T.border}`}} onClick={()=>setYearFilter("all")}>All Years</button>
+              {availableYears.map(y=>(
+                <button key={y} style={{...mkBtn("ghost"),padding:"5px 14px",fontSize:"12px",background:yearFilter===y?"#2A5A8A":"transparent",color:yearFilter===y?"#FFFFFF":T.muted,border:`1px solid ${yearFilter===y?"#2A5A8A":T.border}`}} onClick={()=>setYearFilter(y)}>{y}</button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Row 4: Date range + Group by */}
         <div style={{display:"flex",gap:"10px",flexWrap:"wrap",alignItems:"flex-end"}}>
           <div style={{display:"flex",gap:"8px",alignItems:"flex-end",flexWrap:"wrap",flex:1}}>
             <div>
@@ -1648,8 +1816,165 @@ function ReportsView({fields,activities,onBack,filterFieldId=null}){
   );
 }
 
+// ── Crop Rotation View ────────────────────────────────────────────────
+const CROP_COLORS = {
+  "Wheat":"#D4A820","Durum":"#C89018","Barley":"#B8A030","Oats":"#C8B840",
+  "Canola":"#90B020","Flax":"#6080B0","Peas":"#60A060","Lentils":"#A87840",
+  "Chickpeas":"#C8A060","Mustard":"#D0B020","Corn":"#E0C030","Soybeans":"#80A040",
+  "Sunflowers":"#E0A020","Alfalfa":"#50A060","Hay":"#90A840","Fallow":"#C0B8A8",
+  "Other":"#A09080",
+};
+
+function CropRotationView({fields,activities,onBack}){
+  const [selectedField,setSelectedField]=useState(null);
+
+  // Get all years with seeding activity
+  const seedingActs = activities.filter(a=>a.type==="seeding");
+  const allYears = [...new Set(seedingActs.map(a=>a.date?.slice(0,4)).filter(Boolean))].sort((a,b)=>b-a);
+  // Also include current year
+  const currentYear = String(new Date().getFullYear());
+  if(!allYears.includes(currentYear)) allYears.unshift(currentYear);
+
+  // Build rotation grid: field → year → crops[]
+  const getFieldYearCrops = (fieldId, year) => {
+    const acts = seedingActs.filter(a=>a.fieldId===fieldId && a.date?.startsWith(year));
+    const crops = [];
+    acts.forEach(a=>{
+      const d = a.data||{};
+      if(d.crops) d.crops.forEach(c=>c.crop&&crops.push(c.crop));
+      else if(d.crop) crops.push(d.crop);
+    });
+    return [...new Set(crops)];
+  };
+
+  const sortedFields = [...fields].sort((a,b)=>a.name.localeCompare(b.name));
+
+  // Detail panel for selected field
+  const detailField = selectedField ? fields.find(f=>f.id===selectedField) : null;
+  const detailRotation = detailField ? allYears.map(y=>({
+    year:y,
+    crops:getFieldYearCrops(detailField.id,y),
+    acts:seedingActs.filter(a=>a.fieldId===detailField.id&&a.date?.startsWith(y)),
+  })).filter(r=>r.crops.length>0) : [];
+
+  return(
+    <div>
+      <div style={{display:"flex",alignItems:"center",gap:"10px",marginBottom:"20px"}}>
+        <button style={{...mkBtn("ghost"),padding:"6px 12px"}} onClick={onBack}>← Home</button>
+        <h2 style={{fontFamily:"'Playfair Display',serif",fontSize:"22px",margin:0,flex:1}}>Crop Rotation</h2>
+        <span style={{fontSize:"13px",color:T.muted}}>{sortedFields.length} fields · {allYears.length} years</span>
+      </div>
+
+      {seedingActs.length===0&&(
+        <div style={{...S.card,textAlign:"center",padding:"48px",color:T.faint}}>
+          <div style={{fontSize:"40px",marginBottom:"12px"}}>🌱</div>
+          No seeding records yet. Log seeding activities to see your crop rotation.
+        </div>
+      )}
+
+      {/* Grid */}
+      {sortedFields.length>0&&(
+        <div style={{...S.card,overflowX:"auto",marginBottom:"16px"}}>
+          <table style={{width:"100%",borderCollapse:"collapse",minWidth:"400px"}}>
+            <thead>
+              <tr>
+                <th style={{textAlign:"left",padding:"8px 12px",fontSize:"12px",color:T.muted,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.7px",borderBottom:`2px solid ${T.border}`,minWidth:"140px"}}>Field</th>
+                {allYears.map(y=>(
+                  <th key={y} style={{textAlign:"center",padding:"8px 10px",fontSize:"12px",color:T.muted,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.7px",borderBottom:`2px solid ${T.border}`,minWidth:"100px"}}>{y}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {sortedFields.map((f,fi)=>(
+                <tr key={f.id} style={{background:fi%2===0?T.card:"#F8F4EE",cursor:"pointer",transition:"background .1s"}}
+                  onClick={()=>setSelectedField(selectedField===f.id?null:f.id)}
+                  onMouseEnter={e=>e.currentTarget.style.background="#F0E8D8"}
+                  onMouseLeave={e=>e.currentTarget.style.background=fi%2===0?T.card:"#F8F4EE"}>
+                  <td style={{padding:"10px 12px",borderBottom:`1px solid ${T.border}`}}>
+                    <div style={{fontWeight:700,fontSize:"13px"}}>{f.name}</div>
+                    {f.acres&&<div style={{fontSize:"11px",color:T.muted}}>{f.acres} ac</div>}
+                  </td>
+                  {allYears.map(y=>{
+                    const crops=getFieldYearCrops(f.id,y);
+                    return(
+                      <td key={y} style={{padding:"6px 8px",textAlign:"center",borderBottom:`1px solid ${T.border}`}}>
+                        {crops.length>0
+                          ? <div style={{display:"flex",gap:"3px",justifyContent:"center",flexWrap:"wrap"}}>
+                              {crops.map((c,i)=>(
+                                <span key={i} style={{
+                                  display:"inline-block",padding:"3px 8px",borderRadius:"10px",
+                                  fontSize:"11px",fontWeight:600,
+                                  background:(CROP_COLORS[c]||CROP_COLORS.Other)+"25",
+                                  border:`1px solid ${(CROP_COLORS[c]||CROP_COLORS.Other)}60`,
+                                  color:CROP_COLORS[c]||CROP_COLORS.Other,
+                                }}>{c}</span>
+                              ))}
+                            </div>
+                          : <span style={{color:T.faint,fontSize:"12px"}}>—</span>
+                        }
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Crop legend */}
+      {seedingActs.length>0&&(
+        <div style={{...S.card,marginBottom:"16px"}}>
+          <p style={{margin:"0 0 8px",fontSize:"11px",color:T.muted,textTransform:"uppercase",letterSpacing:"0.8px",fontWeight:700}}>Crop Legend</p>
+          <div style={{display:"flex",gap:"6px",flexWrap:"wrap"}}>
+            {[...new Set(seedingActs.flatMap(a=>{ const d=a.data||{}; return d.crops?d.crops.map(c=>c.crop).filter(Boolean):[d.crop].filter(Boolean); }))].map(c=>(
+              <span key={c} style={{padding:"3px 10px",borderRadius:"10px",fontSize:"12px",fontWeight:600,background:(CROP_COLORS[c]||CROP_COLORS.Other)+"25",border:`1px solid ${(CROP_COLORS[c]||CROP_COLORS.Other)}60`,color:CROP_COLORS[c]||CROP_COLORS.Other}}>{c}</span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Detail panel for selected field */}
+      {detailField&&(
+        <div style={S.card}>
+          <h3 style={{fontFamily:"'Playfair Display',serif",fontSize:"16px",color:T.gold,margin:"0 0 14px"}}>
+            🌾 {detailField.name} — Rotation History
+          </h3>
+          {detailRotation.length===0
+            ?<p style={{color:T.faint,fontSize:"13px"}}>No seeding records for this field.</p>
+            :<div style={{display:"flex",flexDirection:"column",gap:"10px"}}>
+              {detailRotation.map(({year,crops,acts})=>(
+                <div key={year} style={{display:"flex",gap:"12px",alignItems:"flex-start",padding:"10px 12px",background:"#F8F4EE",borderRadius:"8px",border:`1px solid ${T.border}`}}>
+                  <span style={{fontWeight:700,fontSize:"18px",color:T.muted,minWidth:"44px"}}>{year}</span>
+                  <div style={{flex:1}}>
+                    <div style={{display:"flex",gap:"6px",flexWrap:"wrap",marginBottom:"5px"}}>
+                      {crops.map((c,i)=><span key={i} style={{padding:"3px 10px",borderRadius:"10px",fontSize:"12px",fontWeight:600,background:(CROP_COLORS[c]||CROP_COLORS.Other)+"25",border:`1px solid ${(CROP_COLORS[c]||CROP_COLORS.Other)}60`,color:CROP_COLORS[c]||CROP_COLORS.Other}}>{c}</span>)}
+                    </div>
+                    {acts.map((a,i)=>{
+                      const d=a.data||{};
+                      const ferts=(d.ferts||[]).map(f=>f.blend==="Custom Blend"?f.custom:f.blend).filter(Boolean);
+                      const legacyFert=d.fertBlend&&d.fertBlend!=="Custom Blend"?d.fertBlend:d.fertCustom;
+                      return(
+                        <div key={i} style={{fontSize:"12px",color:T.muted}}>
+                          {new Date(a.date).toLocaleDateString("en-US",{month:"short",day:"numeric"})}
+                          {(ferts.length>0||legacyFert)&&<span style={{marginLeft:"8px"}}>Fert: {ferts.length>0?ferts.join(", "):legacyFert}</span>}
+                          {a.notes&&<span style={{marginLeft:"8px",fontStyle:"italic"}}>"{a.notes}"</span>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          }
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Home View ─────────────────────────────────────────────────────────
-function HomeView({fields,activities,onSelect,onAdd,onImport,onReport}){
+function HomeView({fields,activities,onSelect,onAdd,onImport,onReport,onRotation}){
   const[q,setQ]=useState("");
   const filtered=fields.filter(f=>f.name.toLowerCase().includes(q.toLowerCase())||(f.legalDesc||"").toLowerCase().includes(q.toLowerCase()));
   return(
@@ -1660,6 +1985,7 @@ function HomeView({fields,activities,onSelect,onAdd,onImport,onReport}){
           <h2 style={{fontFamily:"'Playfair Display',serif",fontSize:"24px",margin:"0 0 4px",color:T.gold}}>FieldLog</h2>
           <p style={{margin:0,fontSize:"13px",color:T.muted}}>{fields.length} field{fields.length!==1?"s":""} · {activities.length} activit{activities.length!==1?"ies":"y"} logged</p>
         </div>
+        <button style={{...mkBtn("ghost"),padding:"10px 16px",fontSize:"14px"}} onClick={onRotation}>🔄 Rotation</button>
         <button style={{...mkBtn("ghost"),padding:"10px 16px",fontSize:"14px"}} onClick={onReport}>📊 Reports</button>
         <button style={{...mkBtn("ghost"),padding:"10px 16px",fontSize:"14px"}} onClick={onImport}>⬆ Import</button>
         <button style={{...mkBtn("primary"),padding:"10px 20px",fontSize:"14px"}} onClick={onAdd}>+ Add Field</button>
@@ -1697,15 +2023,163 @@ function HomeView({fields,activities,onSelect,onAdd,onImport,onReport}){
 // ╔═══════════════════════════════════════════════════════════╗
 // ║  ROOT APP — Firebase sync wired in here                  ║
 // ╚═══════════════════════════════════════════════════════════╝
+// ── Settings Modal ────────────────────────────────────────────────────
+function SettingsModal({settings,onSave,onClose}){
+  const[s,setS]=useState(settings);
+  const upd=(k,v)=>setS(p=>({...p,[k]:v}));
+
+  const toggle=(k)=>setS(p=>({...p,[k]:!p[k]}));
+
+  const save=()=>{ onSave(s); onClose(); };
+
+  const sectionHead={fontFamily:"'Playfair Display',serif",fontSize:"15px",color:T.gold,margin:"0 0 12px"};
+  const row={display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 0",borderBottom:`1px solid ${T.border}`};
+  const desc={fontSize:"12px",color:T.muted,marginTop:"2px"};
+
+  // Toggle switch style
+  const Switch=({on,onChange})=>(
+    <div onClick={onChange} style={{
+      width:"44px",height:"24px",borderRadius:"12px",cursor:"pointer",
+      background:on?T.green:"#C8C0B8",
+      position:"relative",transition:"background .2s",flexShrink:0,
+    }}>
+      <div style={{
+        position:"absolute",top:"3px",
+        left:on?"23px":"3px",
+        width:"18px",height:"18px",borderRadius:"50%",
+        background:"#FFFFFF",transition:"left .2s",
+        boxShadow:"0 1px 3px rgba(0,0,0,0.2)",
+      }}/>
+    </div>
+  );
+
+  return(
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:300,display:"flex",alignItems:"flex-start",justifyContent:"center",padding:"20px 12px",overflowY:"auto"}}>
+      <div style={{background:"#FDFAF4",border:`1px solid ${T.borderHi}`,borderRadius:"12px",width:"100%",maxWidth:"540px",padding:"24px",marginTop:"10px"}}>
+
+        {/* Header */}
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"22px"}}>
+          <h2 style={{fontFamily:"'Playfair Display',serif",fontSize:"20px",color:T.gold,margin:0}}>⚙️ Settings</h2>
+          <button style={{...mkBtn("ghost"),padding:"5px 10px"}} onClick={onClose}>✕</button>
+        </div>
+
+        {/* ── AgriScale Integration ── */}
+        <div style={{marginBottom:"22px"}}>
+          <h3 style={sectionHead}>⚖️ AgriScale Integration</h3>
+
+          <div style={row}>
+            <div>
+              <div style={{fontWeight:600,fontSize:"13px"}}>Enable AgriScale Connection</div>
+              <div style={desc}>Connect to the Mattson Bros grain cart app to sync harvest data</div>
+            </div>
+            <Switch on={!!s.agriScaleEnabled} onChange={()=>toggle("agriScaleEnabled")}/>
+          </div>
+
+          {s.agriScaleEnabled&&<>
+            <div style={{...S.row,paddingTop:"10px"}}>
+              <label style={S.label}>AgriScale Firebase URL</label>
+              <input style={S.input} type="text"
+                placeholder="https://mattson-bros-grain-cart-default-rtdb.firebaseio.com"
+                value={s.agriScaleUrl||""}
+                onChange={e=>upd("agriScaleUrl",e.target.value)}/>
+              <p style={{margin:"4px 0 0",fontSize:"11px",color:T.muted}}>⚠️ Ensure Firebase rules on this project are not expired</p>
+            </div>
+
+            <div style={{...S.row,paddingTop:"6px"}}>
+              <label style={S.label}>Harvest Sync Mode</label>
+              <div style={{display:"flex",gap:"0",borderRadius:"7px",overflow:"hidden",border:`1px solid ${T.border}`}}>
+                {[["auto","⚡ Auto — create record on each load"],["manual","✋ Manual — review & approve loads"]].map(([val,label])=>(
+                  <button key={val} style={{
+                    flex:1,padding:"8px 12px",fontSize:"12px",fontWeight:600,
+                    fontFamily:"'Barlow',sans-serif",cursor:"pointer",border:"none",
+                    background:s.agriScaleMode===val?T.gold:"#F0EAE0",
+                    color:s.agriScaleMode===val?"#FFFFFF":T.muted,
+                    transition:"all .15s",
+                  }} onClick={()=>upd("agriScaleMode",val)}>{label}</button>
+                ))}
+              </div>
+            </div>
+
+            <div style={{background:"#F0F8F5",border:`1px solid #A0C8B0`,borderRadius:"7px",padding:"10px 12px",marginTop:"8px",fontSize:"12px",color:"#2A5040"}}>
+              {s.agriScaleMode==="auto"
+                ? "🟢 Auto — every completed load in AgriScale will immediately create a Harvest activity in the matching field. Field names must match between apps."
+                : "🟡 Manual — a pending loads badge will appear on the home screen. You review and approve which loads to import and which field to assign them to."}
+            </div>
+
+            <div style={{...S.row,marginTop:"10px"}}>
+              <div>
+                <div style={{fontWeight:600,fontSize:"13px"}}>Default Field Matching</div>
+                <div style={desc}>How to match AgriScale loads to FieldLog fields</div>
+              </div>
+              <select style={{...S.input,width:"auto",fontSize:"12px",padding:"5px 10px"}} value={s.agriScaleMatch||"name"} onChange={e=>upd("agriScaleMatch",e.target.value)}>
+                <option value="name">Match by field name</option>
+                <option value="manual">Always assign manually</option>
+              </select>
+            </div>
+          </>}
+        </div>
+
+        {/* ── Display ── */}
+        <div style={{marginBottom:"22px"}}>
+          <h3 style={sectionHead}>🖥 Display</h3>
+          <div style={row}>
+            <div>
+              <div style={{fontWeight:600,fontSize:"13px"}}>Show Acreage on Field Cards</div>
+              <div style={desc}>Display acres next to each field name on the home screen</div>
+            </div>
+            <Switch on={s.showAcres!==false} onChange={()=>toggle("showAcres")}/>
+          </div>
+          <div style={row}>
+            <div>
+              <div style={{fontWeight:600,fontSize:"13px"}}>Show Legal Description on Field Cards</div>
+              <div style={desc}>Display legal description on home screen cards</div>
+            </div>
+            <Switch on={s.showLegal!==false} onChange={()=>toggle("showLegal")}/>
+          </div>
+        </div>
+
+        {/* ── Farm Info ── */}
+        <div style={{marginBottom:"22px"}}>
+          <h3 style={sectionHead}>🌾 Farm Info</h3>
+          <div style={S.g2}>
+            <div style={S.row}>
+              <label style={S.label}>Farm / Operation Name</label>
+              <input style={S.input} type="text" placeholder="e.g. Flat Acre Farms" value={s.farmName||""} onChange={e=>upd("farmName",e.target.value)}/>
+            </div>
+            <div style={S.row}>
+              <label style={S.label}>Operator Name</label>
+              <input style={S.input} type="text" placeholder="Your name" value={s.operatorName||""} onChange={e=>upd("operatorName",e.target.value)}/>
+            </div>
+          </div>
+          <div style={S.row}>
+            <label style={S.label}>Location (County / Province)</label>
+            <input style={S.input} type="text" placeholder="e.g. Liberty County, MT" value={s.location||""} onChange={e=>upd("location",e.target.value)}/>
+          </div>
+        </div>
+
+        <div style={{display:"flex",gap:"8px",justifyContent:"flex-end"}}>
+          <button style={mkBtn("ghost")} onClick={onClose}>Cancel</button>
+          <button style={mkBtn("primary")} onClick={save}>Save Settings</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function App(){
   const[view,setView]      =useState("home");
   const[fields,setFields]  =useState([]);
+  const[showSettings,setShowSettings]=useState(false);
+  const[settings,setSettings]=useState({
+    agriScaleEnabled:false, agriScaleUrl:"", agriScaleMode:"manual",
+    agriScaleMatch:"name", showAcres:true, showLegal:true,
+    farmName:"", operatorName:"", location:"",
+  });
   const[activities,setActs]=useState([]);
   const[loading,setLoading]=useState(true);
   const[sync,setSync]      =useState("idle"); // "idle"|"saving"|"saved"|"error"|"offline"
   const[activeField,setAF]       =useState(null);
-  const[reportFieldId,setRFId]   =useState(null);
-  const[showAdd,setShowAdd] =useState(false);
+  const[reportFieldId,setRFId]   =useState(null);  const[showAdd,setShowAdd] =useState(false);
   const[showImport,setShowImport]=useState(false);
   const skipSSE=useRef(false);  // prevent SSE echo after our own write
 
@@ -1809,11 +2283,12 @@ export default function App(){
           <h1 style={{fontFamily:"'Playfair Display',serif",fontSize:"20px",color:T.gold,margin:0}}>FieldLog</h1>
           <p style={{margin:0,fontSize:"10px",color:T.faint,letterSpacing:"1.2px",textTransform:"uppercase"}}>Farm Activity Tracker</p>
         </div>
-        {/* Sync indicator */}
-        <div style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:"6px"}}>
+        {/* Sync indicator + settings */}
+        <div style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:"8px"}}>
           {syncDot.label&&<span style={{fontSize:"11px",color:sync==="error"?T.danger:sync==="saved"?T.green:T.muted}}>{syncDot.label}</span>}
           <div style={{width:"8px",height:"8px",borderRadius:"50%",background:syncDot.bg,flexShrink:0}}/>
-          {!FB_CONFIGURED&&<span style={{fontSize:"10px",color:"#7A5A20",background:"#2A1A04",border:"1px solid #5A3A10",borderRadius:"4px",padding:"2px 6px"}}>Configure Firebase</span>}
+          {!FB_CONFIGURED&&<span style={{fontSize:"10px",color:"#7A5A20",background:"#F5ECD8",border:"1px solid #D4A840",borderRadius:"4px",padding:"2px 6px"}}>Configure Firebase</span>}
+          <button style={{...mkBtn("ghost"),padding:"5px 9px",fontSize:"16px",lineHeight:1}} onClick={()=>setShowSettings(true)} title="Settings">⚙️</button>
         </div>
         {view!=="home"&&<button style={{...mkBtn("ghost"),padding:"5px 12px",fontSize:"12px"}} onClick={()=>setView("home")}>Home</button>}
       </div>
@@ -1827,14 +2302,16 @@ export default function App(){
       )}
 
       <div style={S.content}>
-        {view==="home"        &&<HomeView fields={fields} activities={activities} onSelect={f=>{setAF(f);setView("fieldDetail");}} onAdd={()=>setView("addField")} onImport={()=>setShowImport(true)} onReport={()=>{setRFId(null);setView("reports");}}/>}
+        {view==="home"        &&<HomeView fields={fields} activities={activities} onSelect={f=>{setAF(f);setView("fieldDetail");}} onAdd={()=>setView("addField")} onImport={()=>setShowImport(true)} onReport={()=>{setRFId(null);setView("reports");}} onRotation={()=>setView("rotation")}/>}
         {view==="reports"     &&<ReportsView fields={fields} activities={activities} onBack={()=>setView(reportFieldId?"fieldDetail":"home")} filterFieldId={reportFieldId}/>}
+        {view==="rotation"    &&<CropRotationView fields={fields} activities={activities} onBack={()=>setView("home")}/>}
         {view==="addField"    &&<AddFieldView onBack={()=>setView("home")} onSave={addField}/>}
         {view==="fieldDetail" &&curField&&<FieldDetailView field={curField} activities={activities} onBack={()=>setView("home")} onAddActivity={()=>setShowAdd(true)} onDeleteActivity={delActivity} onUpdateField={updateField} onDeleteField={deleteField} onReport={()=>{setRFId(curField.id);setView("reports");}}/>}
       </div>
 
       {showAdd&&curField&&<AddActivityModal field={curField} onClose={()=>setShowAdd(false)} onSave={addActivity}/>}
       {showImport&&<ImportFieldsModal onClose={()=>setShowImport(false)} onImport={importFields}/>}
+      {showSettings&&<SettingsModal settings={settings} onSave={setSettings} onClose={()=>setShowSettings(false)}/>}
     </div>
   );
 }
