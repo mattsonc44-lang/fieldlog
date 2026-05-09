@@ -1974,7 +1974,7 @@ function CropRotationView({fields,activities,onBack}){
 }
 
 // ── Home View ─────────────────────────────────────────────────────────
-function HomeView({fields,activities,onSelect,onAdd,onImport,onReport,onRotation}){
+function HomeView({fields,activities,onSelect,onAdd,onImport,onReport,onRotation,pendingCount,onPendingLoads}){
   const[q,setQ]=useState("");
   const filtered=fields.filter(f=>f.name.toLowerCase().includes(q.toLowerCase())||(f.legalDesc||"").toLowerCase().includes(q.toLowerCase()));
   return(
@@ -1985,6 +1985,12 @@ function HomeView({fields,activities,onSelect,onAdd,onImport,onReport,onRotation
           <h2 style={{fontFamily:"'Playfair Display',serif",fontSize:"24px",margin:"0 0 4px",color:T.gold}}>FieldLog</h2>
           <p style={{margin:0,fontSize:"13px",color:T.muted}}>{fields.length} field{fields.length!==1?"s":""} · {activities.length} activit{activities.length!==1?"ies":"y"} logged</p>
         </div>
+        {pendingCount>0&&(
+          <button style={{...mkBtn("ghost"),padding:"10px 14px",fontSize:"14px",borderColor:"#C07010",color:"#8C5408",position:"relative"}} onClick={onPendingLoads}>
+            ⚖️ Loads
+            <span style={{position:"absolute",top:"-6px",right:"-6px",background:T.danger,color:"#fff",borderRadius:"10px",fontSize:"10px",fontWeight:700,padding:"1px 5px",minWidth:"18px",textAlign:"center"}}>{pendingCount}</span>
+          </button>
+        )}
         <button style={{...mkBtn("ghost"),padding:"10px 16px",fontSize:"14px"}} onClick={onRotation}>🔄 Rotation</button>
         <button style={{...mkBtn("ghost"),padding:"10px 16px",fontSize:"14px"}} onClick={onReport}>📊 Reports</button>
         <button style={{...mkBtn("ghost"),padding:"10px 16px",fontSize:"14px"}} onClick={onImport}>⬆ Import</button>
@@ -2023,6 +2029,84 @@ function HomeView({fields,activities,onSelect,onAdd,onImport,onReport,onRotation
 // ╔═══════════════════════════════════════════════════════════╗
 // ║  ROOT APP — Firebase sync wired in here                  ║
 // ╚═══════════════════════════════════════════════════════════╝
+// ── Pending AgriScale Loads Modal ────────────────────────────────────
+function PendingLoadsModal({loads,fields,agriBins,onImport,onClose}){
+  const [assigns,setAssigns]=useState(()=>{
+    const m={};
+    loads.forEach(l=>{
+      const mf=fields.find(f=>{const n=(l._agriFieldName||"").toLowerCase().trim(),fn=f.name.toLowerCase().trim();return fn===n||n.includes(fn)||fn.includes(n);});
+      m[l.id]=mf?.id||"";
+    });
+    return m;
+  });
+  const [sel,setSel]=useState(()=>Object.fromEntries(loads.map(l=>[l.id,true])));
+
+  const loadToBu=(l)=>l.grainBushelLbs>0?Math.round(l.net/l.grainBushelLbs):l.net;
+  const binName=(id)=>agriBins[id]||`Bin ${id}`;
+
+  const doImport=()=>{
+    const toImport=loads.filter(l=>sel[l.id]&&assigns[l.id]).map(l=>({
+      agriLoad:l, fieldId:assigns[l.id],
+      binName:binName(l.binId),
+    }));
+    onImport(toImport);
+    onClose();
+  };
+
+  const importCount=loads.filter(l=>sel[l.id]&&assigns[l.id]).length;
+
+  return(
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",zIndex:250,display:"flex",justifyContent:"center",padding:"20px 12px",overflowY:"auto"}}>
+      <div style={{background:"#FDFAF4",border:`1px solid ${T.borderHi}`,borderRadius:"12px",width:"100%",maxWidth:"620px",padding:"22px",alignSelf:"flex-start",marginTop:"10px"}}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"18px"}}>
+          <h2 style={{fontFamily:"'Playfair Display',serif",fontSize:"20px",color:T.gold,margin:0}}>⚖️ Pending AgriScale Loads</h2>
+          <button style={{...mkBtn("ghost"),padding:"5px 10px"}} onClick={onClose}>✕</button>
+        </div>
+        <p style={{margin:"0 0 14px",fontSize:"13px",color:T.muted}}>
+          {loads.length} new load{loads.length!==1?"s":""} from AgriScale. Select which to import and assign each to a field.
+        </p>
+
+        {loads.map((l,i)=>(
+          <div key={l.id} style={{background:sel[l.id]?T.card:"#F5F0E8",border:`1px solid ${sel[l.id]?T.borderHi:T.border}`,borderRadius:"8px",padding:"12px",marginBottom:"8px"}}>
+            <div style={{display:"flex",gap:"10px",alignItems:"flex-start"}}>
+              <input type="checkbox" checked={!!sel[l.id]} onChange={e=>setSel(s=>({...s,[l.id]:e.target.checked}))}
+                style={{width:"16px",height:"16px",marginTop:"2px",accentColor:T.gold,flexShrink:0}}/>
+              <div style={{flex:1}}>
+                {/* Load summary */}
+                <div style={{display:"flex",gap:"12px",flexWrap:"wrap",marginBottom:"8px",fontSize:"13px"}}>
+                  <span style={{fontWeight:700,color:T.gold}}>{l.grainName?.charAt(0)+(l.grainName?.slice(1)||"").toLowerCase()}</span>
+                  <span><span style={{color:T.muted}}>Bushels:</span> {loadToBu(l).toLocaleString()} bu</span>
+                  <span><span style={{color:T.muted}}>Bin:</span> {binName(l.binId)}</span>
+                  <span><span style={{color:T.muted}}>Date:</span> {l.date}</span>
+                  {l.operator&&<span><span style={{color:T.muted}}>Operator:</span> {l.operator}</span>}
+                </div>
+                <div style={{display:"flex",gap:"8px",alignItems:"center",flexWrap:"wrap"}}>
+                  <span style={{fontSize:"11px",color:T.muted,whiteSpace:"nowrap"}}>AgriScale field: <strong>{l._agriFieldName}</strong></span>
+                  <span style={{fontSize:"11px",color:T.muted}}>→</span>
+                  <select style={{...S.input,flex:"1 1 160px",padding:"5px 8px",fontSize:"12px",
+                    border:`1px solid ${assigns[l.id]?T.green:T.danger}40`,
+                    background:assigns[l.id]?"#F0F8F0":"#FDF0EE"}}
+                    value={assigns[l.id]||""} onChange={e=>setAssigns(a=>({...a,[l.id]:e.target.value}))}>
+                    <option value="">⚠️ Select FieldLog field…</option>
+                    {[...fields].sort((a,b)=>a.name.localeCompare(b.name)).map(f=><option key={f.id} value={f.id}>{f.name}{f.acres?` (${f.acres}ac)`:""}</option>)}
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+        ))}
+
+        <div style={{display:"flex",gap:"8px",justifyContent:"flex-end",marginTop:"8px"}}>
+          <button style={mkBtn("ghost")} onClick={onClose}>Dismiss All</button>
+          <button style={mkBtn("primary")} onClick={doImport} disabled={importCount===0}>
+            Import {importCount} Load{importCount!==1?"s":""}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Settings Modal ────────────────────────────────────────────────────
 function SettingsModal({settings,onSave,onClose}){
   const[s,setS]=useState(settings);
@@ -2181,6 +2265,7 @@ export default function App(){
   const[activeField,setAF]       =useState(null);
   const[reportFieldId,setRFId]   =useState(null);  const[showAdd,setShowAdd] =useState(false);
   const[showImport,setShowImport]=useState(false);
+  const[showPending,setShowPending]=useState(false);
   const skipSSE=useRef(false);  // prevent SSE echo after our own write
 
   // ── Sync status dot ──────────────────────────────────────
@@ -2265,6 +2350,79 @@ export default function App(){
     setFields(nf); setActs(na); persist(nf,na); setView("home");
   };
 
+  // ── AgriScale integration ────────────────────────────────────────
+  const [pendingLoads,setPendingLoads]=useState([]);
+  const [agriBins,setAgriBins]        =useState({});
+  const seenLoadIds = useRef(new Set());
+  const agriSSERef  = useRef(null);
+
+  const parseAgriDate=(dateStr,timeStr)=>{
+    try{
+      const yr=new Date().getFullYear();
+      const d=new Date(`${dateStr}, ${yr} ${timeStr||"12:00 PM"}`);
+      if(isNaN(d.getTime())) return nowLocal();
+      return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}T${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;
+    }catch{ return nowLocal(); }
+  };
+  const loadToBu=(load)=>load.grainBushelLbs>0?Math.round(load.net/load.grainBushelLbs):load.net;
+  const loadToAct=(load,fieldId,binName)=>({
+    id:genId(),fieldId,type:"harvest",
+    date:parseAgriDate(load.date,load.timeOnly||load.time),
+    data:{
+      crop:load.grainName?load.grainName.charAt(0)+load.grainName.slice(1).toLowerCase():"",
+      totalBushels:String(loadToBu(load)),
+      deliveredTo:binName||`Farm Storage — Bin ${load.binId}`,
+      equipment:"Grain Cart",
+    },
+    notes:`AgriScale Load #${load.id}${load.operator?` · ${load.operator}`:""}${load.truckColor?` · ${load.truckColor} truck`:""}`,
+  });
+  const matchField=(agriName)=>{
+    const n=(agriName||"").toLowerCase().trim();
+    return fields.find(f=>{const fn=f.name.toLowerCase().trim();return fn===n||n.includes(fn)||fn.includes(n);});
+  };
+
+  const processAgriData=useCallback((data)=>{
+    if(!data) return;
+    const binMap={};
+    Object.values(data.bins||{}).forEach(b=>{ if(b.id) binMap[b.id]=b.name; });
+    setAgriBins(binMap);
+    const newLoads=[];
+    Object.values(data.fields||{}).forEach(af=>{
+      Object.values(af.loads||{}).forEach(load=>{
+        if(!seenLoadIds.current.has(load.id)){
+          if(seenLoadIds.current.size>0) newLoads.push({...load,_agriFieldName:af.name});
+          seenLoadIds.current.add(load.id);
+        }
+      });
+    });
+    if(!newLoads.length) return;
+    if(settings.agriScaleMode==="auto"){
+      const toAdd=[];
+      newLoads.forEach(load=>{
+        const mf=matchField(load._agriFieldName);
+        if(mf) toAdd.push(loadToAct(load,mf.id,binMap[load.binId]||`Bin ${load.binId}`));
+        else setPendingLoads(p=>[...p,load]);
+      });
+      if(toAdd.length){ const na=[...activities,...toAdd]; setActs(na); persist(fields,na); }
+    } else {
+      setPendingLoads(p=>[...p,...newLoads]);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[fields,activities,settings.agriScaleMode]);
+
+  useEffect(()=>{
+    if(agriSSERef.current){agriSSERef.current.close();agriSSERef.current=null;}
+    if(!settings.agriScaleEnabled||!settings.agriScaleUrl) return;
+    try{
+      const es=new EventSource(`${settings.agriScaleUrl}/state.json`);
+      agriSSERef.current=es;
+      es.addEventListener("put",(e)=>{ try{const{data}=JSON.parse(e.data);processAgriData(data);}catch(_){} });
+      es.onerror=()=>{};
+    }catch(_){}
+    return()=>{if(agriSSERef.current){agriSSERef.current.close();agriSSERef.current=null;}};
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[settings.agriScaleEnabled,settings.agriScaleUrl,settings.agriScaleMode]);
+
   const curField=activeField?fields.find(f=>f.id===activeField.id)||activeField:null;
 
   if(loading) return(
@@ -2302,7 +2460,7 @@ export default function App(){
       )}
 
       <div style={S.content}>
-        {view==="home"        &&<HomeView fields={fields} activities={activities} onSelect={f=>{setAF(f);setView("fieldDetail");}} onAdd={()=>setView("addField")} onImport={()=>setShowImport(true)} onReport={()=>{setRFId(null);setView("reports");}} onRotation={()=>setView("rotation")}/>}
+        {view==="home"        &&<HomeView fields={fields} activities={activities} onSelect={f=>{setAF(f);setView("fieldDetail");}} onAdd={()=>setView("addField")} onImport={()=>setShowImport(true)} onReport={()=>{setRFId(null);setView("reports");}} onRotation={()=>setView("rotation")} pendingCount={pendingLoads.length} onPendingLoads={()=>setShowPending(true)}/>}
         {view==="reports"     &&<ReportsView fields={fields} activities={activities} onBack={()=>setView(reportFieldId?"fieldDetail":"home")} filterFieldId={reportFieldId}/>}
         {view==="rotation"    &&<CropRotationView fields={fields} activities={activities} onBack={()=>setView("home")}/>}
         {view==="addField"    &&<AddFieldView onBack={()=>setView("home")} onSave={addField}/>}
@@ -2312,6 +2470,15 @@ export default function App(){
       {showAdd&&curField&&<AddActivityModal field={curField} onClose={()=>setShowAdd(false)} onSave={addActivity}/>}
       {showImport&&<ImportFieldsModal onClose={()=>setShowImport(false)} onImport={importFields}/>}
       {showSettings&&<SettingsModal settings={settings} onSave={setSettings} onClose={()=>setShowSettings(false)}/>}
+      {showPending&&<PendingLoadsModal
+        loads={pendingLoads} fields={fields} agriBins={agriBins}
+        onClose={()=>setShowPending(false)}
+        onImport={(items)=>{
+          const toAdd=items.map(({agriLoad:l,fieldId,binName})=>loadToAct(l,fieldId,binName));
+          const na=[...activities,...toAdd]; setActs(na); persist(fields,na);
+          setPendingLoads(p=>p.filter(l=>!items.find(i=>i.agriLoad.id===l.id)));
+        }}
+      />
     </div>
   );
 }
