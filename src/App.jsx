@@ -2478,7 +2478,7 @@ export default function App(){
           const na=[...activities,...toAdd]; setActs(na); persist(fields,na);
           setPendingLoads(p=>p.filter(l=>!items.find(i=>i.agriLoad.id===l.id)));
         }}
-      />
+      />}
     </div>
   );
 }
