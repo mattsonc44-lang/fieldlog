@@ -722,10 +722,10 @@ function HarvestForm({v,set}){
         )}
       </div>
 
-      {/* AgriScale badge — placeholder for live connection */}
-      <div style={{background:"#F5F5F5",border:`1px solid #D0D0D0`,borderRadius:"6px",padding:"10px 12px",fontSize:"12px",color:T.muted,display:"flex",gap:"8px",alignItems:"center"}}>
+      {/* AgriScale note */}
+      <div style={{background:"#F0F8F5",border:`1px solid #A0C8B0`,borderRadius:"6px",padding:"10px 12px",fontSize:"12px",color:"#2A5040",display:"flex",gap:"8px",alignItems:"center"}}>
         <span style={{fontSize:"16px"}}>⚖️</span>
-        <span>AgriScale live sync coming — loads will auto-populate here when connected.</span>
+        <span>AgriScale connected — use <strong>⚖️ Loads</strong> on the home screen to import harvest totals, or enable Auto sync in Settings.</span>
       </div>
     </div>
   );
@@ -2103,7 +2103,7 @@ function PendingLoadsModal({loads,fields,onImport,onClose}){
 }
 
 // ── Settings Modal ────────────────────────────────────────────────────
-function SettingsModal({settings,onSave,onClose}){
+function SettingsModal({settings,onSave,onClose,onBulkImport,bulkLoading}){
   const[s,setS]=useState(settings);
   const upd=(k,v)=>setS(p=>({...p,[k]:v}));
 
@@ -2194,6 +2194,17 @@ function SettingsModal({settings,onSave,onClose}){
                 <option value="name">Match by field name</option>
                 <option value="manual">Always assign manually</option>
               </select>
+            </div>
+
+            {/* One-time bulk import */}
+            <div style={{marginTop:"14px",padding:"12px",background:"#F0F8F5",border:`1px solid #A0C8B0`,borderRadius:"8px"}}>
+              <div style={{fontWeight:600,fontSize:"13px",marginBottom:"4px",color:"#2A5040"}}>Import Current AgriScale Data</div>
+              <div style={{...desc,marginBottom:"10px"}}>Pull all existing field totals right now — useful for loading historical harvest data or catching up after connecting.</div>
+              <button style={{...mkBtn("primary"),background:"#2A6A48",fontSize:"12px",padding:"7px 16px"}}
+                onClick={()=>{ save(); onBulkImport(); }}
+                disabled={bulkLoading||!s.agriScaleUrl}>
+                {bulkLoading?"⏳ Loading…":"⬇ Import All Current Data"}
+              </button>
             </div>
           </>}
         </div>
@@ -2445,6 +2456,43 @@ export default function App(){
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[settings.agriScaleEnabled,settings.agriScaleUrl,settings.agriScaleMode]);
 
+  // One-time bulk import of ALL current AgriScale data
+  const [bulkLoading,setBulkLoading]=useState(false);
+  const bulkImportAgriScale=async()=>{
+    if(!settings.agriScaleUrl) return;
+    setBulkLoading(true);
+    try{
+      const resp=await fetch(`${settings.agriScaleUrl}/state.json`);
+      const data=await resp.json();
+      if(!data) throw new Error("No data");
+      const binMap={};
+      Object.values(data.bins||{}).forEach(b=>{ if(b.id) binMap[b.id]=b.name; });
+      setAgriBins(binMap);
+      // Aggregate all loads by field regardless of seenLoadIds
+      const byField={};
+      Object.values(data.fields||{}).forEach(af=>{
+        const loads=Object.values(af.loads||{});
+        if(!loads.length) return;
+        const key=af.name;
+        byField[key]={
+          _agriFieldName:af.name, _agriFieldAcres:af.acres,
+          crop:loads[0]?.grainName||"",
+          totalBu:loads.reduce((s,l)=>s+loadToBu(l),0),
+          loadCount:loads.length,
+          loadIds:loads.map(l=>l.id),
+          date:loads[loads.length-1]?.date||"",
+        };
+        // Mark all as seen
+        loads.forEach(l=>seenLoadIds.current.add(l.id));
+      });
+      const groups=Object.values(byField).filter(g=>g.totalBu>0);
+      if(!groups.length){ setBulkLoading(false); return; }
+      setPendingLoads(groups);
+      setShowPending(true);
+    }catch(e){ alert("Could not read AgriScale data: "+e.message); }
+    finally{ setBulkLoading(false); }
+  };
+
   const curField=activeField?fields.find(f=>f.id===activeField.id)||activeField:null;
 
   if(loading) return(
@@ -2491,7 +2539,7 @@ export default function App(){
 
       {showAdd&&curField&&<AddActivityModal field={curField} onClose={()=>setShowAdd(false)} onSave={addActivity}/>}
       {showImport&&<ImportFieldsModal onClose={()=>setShowImport(false)} onImport={importFields}/>}
-      {showSettings&&<SettingsModal settings={settings} onSave={setSettings} onClose={()=>setShowSettings(false)}/>}
+      {showSettings&&<SettingsModal settings={settings} onSave={setSettings} onClose={()=>setShowSettings(false)} onBulkImport={bulkImportAgriScale} bulkLoading={bulkLoading}/>}
       {showPending&&<PendingLoadsModal
         loads={pendingLoads} fields={fields}
         onClose={()=>setShowPending(false)}
