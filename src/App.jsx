@@ -2030,63 +2030,58 @@ function HomeView({fields,activities,onSelect,onAdd,onImport,onReport,onRotation
 // ║  ROOT APP — Firebase sync wired in here                  ║
 // ╚═══════════════════════════════════════════════════════════╝
 // ── Pending AgriScale Loads Modal ────────────────────────────────────
-function PendingLoadsModal({loads,fields,agriBins,onImport,onClose}){
-  const [assigns,setAssigns]=useState(()=>{
+function PendingLoadsModal({loads,fields,onImport,onClose}){
+  const[assigns,setAssigns]=useState(()=>{
     const m={};
-    loads.forEach(l=>{
-      const mf=fields.find(f=>{const n=(l._agriFieldName||"").toLowerCase().trim(),fn=f.name.toLowerCase().trim();return fn===n||n.includes(fn)||fn.includes(n);});
-      m[l.id]=mf?.id||"";
+    loads.forEach(g=>{
+      const mf=fields.find(f=>{const n=(g._agriFieldName||"").toLowerCase().trim(),fn=f.name.toLowerCase().trim();return fn===n||n.includes(fn)||fn.includes(n);});
+      m[g._agriFieldName]=mf?.id||"";
     });
     return m;
   });
-  const [sel,setSel]=useState(()=>Object.fromEntries(loads.map(l=>[l.id,true])));
-
-  const loadToBu=(l)=>l.grainBushelLbs>0?Math.round(l.net/l.grainBushelLbs):l.net;
-  const binName=(id)=>agriBins[id]||`Bin ${id}`;
+  const[sel,setSel]=useState(()=>Object.fromEntries(loads.map(g=>[g._agriFieldName,true])));
 
   const doImport=()=>{
-    const toImport=loads.filter(l=>sel[l.id]&&assigns[l.id]).map(l=>({
-      agriLoad:l, fieldId:assigns[l.id],
-      binName:binName(l.binId),
-    }));
-    onImport(toImport);
+    const items=loads.filter(g=>sel[g._agriFieldName]&&assigns[g._agriFieldName]).map(g=>({group:g,fieldId:assigns[g._agriFieldName]}));
+    onImport(items);
     onClose();
   };
 
-  const importCount=loads.filter(l=>sel[l.id]&&assigns[l.id]).length;
+  const importCount=loads.filter(g=>sel[g._agriFieldName]&&assigns[g._agriFieldName]).length;
 
   return(
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",zIndex:250,display:"flex",justifyContent:"center",padding:"20px 12px",overflowY:"auto"}}>
-      <div style={{background:"#FDFAF4",border:`1px solid ${T.borderHi}`,borderRadius:"12px",width:"100%",maxWidth:"620px",padding:"22px",alignSelf:"flex-start",marginTop:"10px"}}>
-        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"18px"}}>
-          <h2 style={{fontFamily:"'Playfair Display',serif",fontSize:"20px",color:T.gold,margin:0}}>⚖️ Pending AgriScale Loads</h2>
+      <div style={{background:"#FDFAF4",border:`1px solid ${T.borderHi}`,borderRadius:"12px",width:"100%",maxWidth:"560px",padding:"22px",alignSelf:"flex-start",marginTop:"10px"}}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"16px"}}>
+          <h2 style={{fontFamily:"'Playfair Display',serif",fontSize:"20px",color:T.gold,margin:0}}>⚖️ AgriScale Harvest Import</h2>
           <button style={{...mkBtn("ghost"),padding:"5px 10px"}} onClick={onClose}>✕</button>
         </div>
         <p style={{margin:"0 0 14px",fontSize:"13px",color:T.muted}}>
-          {loads.length} new load{loads.length!==1?"s":""} from AgriScale. Select which to import and assign each to a field.
+          {loads.length} field{loads.length!==1?"s":""} with new harvest data. Assign each to a FieldLog field to import totals.
         </p>
 
-        {loads.map((l,i)=>(
-          <div key={l.id} style={{background:sel[l.id]?T.card:"#F5F0E8",border:`1px solid ${sel[l.id]?T.borderHi:T.border}`,borderRadius:"8px",padding:"12px",marginBottom:"8px"}}>
-            <div style={{display:"flex",gap:"10px",alignItems:"flex-start"}}>
-              <input type="checkbox" checked={!!sel[l.id]} onChange={e=>setSel(s=>({...s,[l.id]:e.target.checked}))}
-                style={{width:"16px",height:"16px",marginTop:"2px",accentColor:T.gold,flexShrink:0}}/>
+        {loads.map(g=>(
+          <div key={g._agriFieldName} style={{background:sel[g._agriFieldName]?T.card:"#F5F0E8",border:`1px solid ${sel[g._agriFieldName]?T.borderHi:T.border}`,borderRadius:"8px",padding:"12px",marginBottom:"8px"}}>
+            <div style={{display:"flex",gap:"10px",alignItems:"center"}}>
+              <input type="checkbox" checked={!!sel[g._agriFieldName]} onChange={e=>setSel(s=>({...s,[g._agriFieldName]:e.target.checked}))}
+                style={{width:"16px",height:"16px",accentColor:T.gold,flexShrink:0}}/>
               <div style={{flex:1}}>
-                {/* Load summary */}
-                <div style={{display:"flex",gap:"12px",flexWrap:"wrap",marginBottom:"8px",fontSize:"13px"}}>
-                  <span style={{fontWeight:700,color:T.gold}}>{l.grainName?.charAt(0)+(l.grainName?.slice(1)||"").toLowerCase()}</span>
-                  <span><span style={{color:T.muted}}>Bushels:</span> {loadToBu(l).toLocaleString()} bu</span>
-                  <span><span style={{color:T.muted}}>Bin:</span> {binName(l.binId)}</span>
-                  <span><span style={{color:T.muted}}>Date:</span> {l.date}</span>
-                  {l.operator&&<span><span style={{color:T.muted}}>Operator:</span> {l.operator}</span>}
+                {/* Totals summary */}
+                <div style={{display:"flex",gap:"12px",alignItems:"baseline",marginBottom:"8px",flexWrap:"wrap"}}>
+                  <span style={{fontWeight:700,fontSize:"14px"}}>{g._agriFieldName}</span>
+                  <span style={{color:T.gold,fontWeight:700,fontSize:"16px"}}>{Math.round(g.totalBu).toLocaleString()} bu</span>
+                  <span style={{color:T.muted,fontSize:"12px"}}>{g.crop?g.crop.charAt(0)+g.crop.slice(1).toLowerCase():""}</span>
+                  <span style={{color:T.muted,fontSize:"12px"}}>{g.loadCount} load{g.loadCount!==1?"s":""}</span>
+                  {g.date&&<span style={{color:T.muted,fontSize:"12px"}}>{g.date}</span>}
                 </div>
-                <div style={{display:"flex",gap:"8px",alignItems:"center",flexWrap:"wrap"}}>
-                  <span style={{fontSize:"11px",color:T.muted,whiteSpace:"nowrap"}}>AgriScale field: <strong>{l._agriFieldName}</strong></span>
-                  <span style={{fontSize:"11px",color:T.muted}}>→</span>
-                  <select style={{...S.input,flex:"1 1 160px",padding:"5px 8px",fontSize:"12px",
-                    border:`1px solid ${assigns[l.id]?T.green:T.danger}40`,
-                    background:assigns[l.id]?"#F0F8F0":"#FDF0EE"}}
-                    value={assigns[l.id]||""} onChange={e=>setAssigns(a=>({...a,[l.id]:e.target.value}))}>
+                {/* Field assignment */}
+                <div style={{display:"flex",gap:"8px",alignItems:"center"}}>
+                  <span style={{fontSize:"11px",color:T.muted,whiteSpace:"nowrap"}}>Import to:</span>
+                  <select style={{...S.input,flex:1,padding:"5px 8px",fontSize:"12px",
+                    border:`1px solid ${assigns[g._agriFieldName]?T.green:T.danger}40`,
+                    background:assigns[g._agriFieldName]?"#F0F8F0":"#FDF0EE"}}
+                    value={assigns[g._agriFieldName]||""}
+                    onChange={e=>setAssigns(a=>({...a,[g._agriFieldName]:e.target.value}))}>
                     <option value="">⚠️ Select FieldLog field…</option>
                     {[...fields].sort((a,b)=>a.name.localeCompare(b.name)).map(f=><option key={f.id} value={f.id}>{f.name}{f.acres?` (${f.acres}ac)`:""}</option>)}
                   </select>
@@ -2096,10 +2091,10 @@ function PendingLoadsModal({loads,fields,agriBins,onImport,onClose}){
           </div>
         ))}
 
-        <div style={{display:"flex",gap:"8px",justifyContent:"flex-end",marginTop:"8px"}}>
-          <button style={mkBtn("ghost")} onClick={onClose}>Dismiss All</button>
+        <div style={{display:"flex",gap:"8px",justifyContent:"flex-end",marginTop:"12px"}}>
+          <button style={mkBtn("ghost")} onClick={onClose}>Dismiss</button>
           <button style={mkBtn("primary")} onClick={doImport} disabled={importCount===0}>
-            Import {importCount} Load{importCount!==1?"s":""}
+            Import {importCount} Field{importCount!==1?"s":""}
           </button>
         </div>
       </div>
@@ -2376,6 +2371,17 @@ export default function App(){
     },
     notes:`AgriScale Load #${load.id}${load.operator?` · ${load.operator}`:""}${load.truckColor?` · ${load.truckColor} truck`:""}`,
   });
+  const groupToAct=(g,fieldId)=>({
+    id:genId(),fieldId,type:"harvest",
+    date:parseAgriDate(g.date,""),
+    data:{
+      crop:g.crop?g.crop.charAt(0)+g.crop.slice(1).toLowerCase():"",
+      totalBushels:String(Math.round(g.totalBu)),
+      deliveredTo:"Farm Storage",
+      equipment:"Grain Cart",
+    },
+    notes:`AgriScale import · ${g.loadCount} load${g.loadCount!==1?"s":""} · ${Math.round(g.totalBu).toLocaleString()} bu total`,
+  });
   const matchField=(agriName)=>{
     const n=(agriName||"").toLowerCase().trim();
     return fields.find(f=>{const fn=f.name.toLowerCase().trim();return fn===n||n.includes(fn)||fn.includes(n);});
@@ -2386,26 +2392,42 @@ export default function App(){
     const binMap={};
     Object.values(data.bins||{}).forEach(b=>{ if(b.id) binMap[b.id]=b.name; });
     setAgriBins(binMap);
-    const newLoads=[];
+
+    // Find new load IDs across all fields
+    const newByField={};  // agriFieldName → { name, acres, crop, totalBu, loadCount, loadIds, date }
     Object.values(data.fields||{}).forEach(af=>{
       Object.values(af.loads||{}).forEach(load=>{
         if(!seenLoadIds.current.has(load.id)){
-          if(seenLoadIds.current.size>0) newLoads.push({...load,_agriFieldName:af.name});
+          if(seenLoadIds.current.size>0){
+            const key=af.name;
+            if(!newByField[key]) newByField[key]={
+              _agriFieldName:af.name, _agriFieldAcres:af.acres,
+              crop:load.grainName||"", totalBu:0, loadCount:0, loadIds:[], date:load.date,
+            };
+            newByField[key].totalBu   += loadToBu(load);
+            newByField[key].loadCount += 1;
+            newByField[key].loadIds.push(load.id);
+            // Keep latest date
+            newByField[key].date = load.date;
+          }
           seenLoadIds.current.add(load.id);
         }
       });
     });
-    if(!newLoads.length) return;
+
+    const newGroups=Object.values(newByField);
+    if(!newGroups.length) return;
+
     if(settings.agriScaleMode==="auto"){
       const toAdd=[];
-      newLoads.forEach(load=>{
-        const mf=matchField(load._agriFieldName);
-        if(mf) toAdd.push(loadToAct(load,mf.id,binMap[load.binId]||`Bin ${load.binId}`));
-        else setPendingLoads(p=>[...p,load]);
+      newGroups.forEach(g=>{
+        const mf=matchField(g._agriFieldName);
+        if(mf) toAdd.push(groupToAct(g,mf.id));
+        else setPendingLoads(p=>[...p,g]);
       });
       if(toAdd.length){ const na=[...activities,...toAdd]; setActs(na); persist(fields,na); }
     } else {
-      setPendingLoads(p=>[...p,...newLoads]);
+      setPendingLoads(p=>[...p,...newGroups]);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[fields,activities,settings.agriScaleMode]);
@@ -2471,12 +2493,12 @@ export default function App(){
       {showImport&&<ImportFieldsModal onClose={()=>setShowImport(false)} onImport={importFields}/>}
       {showSettings&&<SettingsModal settings={settings} onSave={setSettings} onClose={()=>setShowSettings(false)}/>}
       {showPending&&<PendingLoadsModal
-        loads={pendingLoads} fields={fields} agriBins={agriBins}
+        loads={pendingLoads} fields={fields}
         onClose={()=>setShowPending(false)}
         onImport={(items)=>{
-          const toAdd=items.map(({agriLoad:l,fieldId,binName})=>loadToAct(l,fieldId,binName));
+          const toAdd=items.map(({group:g,fieldId})=>groupToAct(g,fieldId));
           const na=[...activities,...toAdd]; setActs(na); persist(fields,na);
-          setPendingLoads(p=>p.filter(l=>!items.find(i=>i.agriLoad.id===l.id)));
+          setPendingLoads(p=>p.filter(g=>!items.find(i=>i.group._agriFieldName===g._agriFieldName)));
         }}
       />}
     </div>
